@@ -82,17 +82,15 @@ class JQuantsProvider(DataProvider):
 
     @staticmethod
     def _find_sector(row: dict):
-        """33業種名を柔軟に探す（フィールド名の揺れに対応）。"""
+        """33業種名を柔軟に探す（V2 は S33Nm。フィールド名の揺れに対応）。"""
         v = JQuantsProvider._first(
-            row, "Sector33CodeName", "Sector33Name", "sector33CodeName", "sector33Name"
+            row, "S33Nm", "Sector33CodeName", "Sector33Name", "sector33CodeName"
         )
         if v:
             return v
-        # 総当たり: 名前に Sector33/業種 を含み Name/名 で終わるキー
-        for k, val in row.items():
-            if val and ("Sector33" in k or "33業種" in k) and ("Name" in k or "名" in k):
-                return val
-        return JQuantsProvider._first(row, "Sector17CodeName", "Sector17Name")
+        return JQuantsProvider._first(
+            row, "S17Nm", "Sector17CodeName", "Sector17Name"
+        )
 
     # ------------------------------------------------------------ セクター表
     def get_sector_map(self) -> dict[str, str]:
@@ -133,8 +131,6 @@ class JQuantsProvider(DataProvider):
         )
         series_by_date: dict[pd.Timestamp, pd.Series] = {}
         got = 0
-        saw_rows_no_value = False
-        sample_keys: list[str] = []
         for day in reversed(cal):  # 新しい日から遡って必要日数だけ集める
             ymd = day.strftime("%Y-%m-%d")
             rows = self._get_paginated(
@@ -146,24 +142,25 @@ class JQuantsProvider(DataProvider):
             values: dict[str, float] = {}
             for row in rows:
                 code = str(self._first(row, "Code", "code", "LocalCode") or "").strip()
-                t = self._first(row, "TurnoverValue", "turnoverValue", "Turnover")
+                t = self._first(
+                    row, "TurnoverValue", "turnoverValue", "Turnover",
+                    "TrdVal", "TVal", "Val", "TradingValue",
+                )
                 if code and t is not None:
                     values[code] = float(t)
             if values:
                 series_by_date[day] = pd.Series(values)
                 got += 1
-            elif not saw_rows_no_value:
-                saw_rows_no_value = True
-                sample_keys = list(rows[0].keys())
+            else:
+                # データはあるのに売買代金が取れない = フィールド名違い。即座に実名を出す。
+                raise RuntimeError(
+                    "売買代金フィールドを特定できませんでした。bars の実フィールド例: "
+                    f"{list(rows[0].keys())}"
+                )
             if got >= self.lookback_days:
                 break
 
         if not series_by_date:
-            if saw_rows_no_value:
-                raise RuntimeError(
-                    "売買代金フィールドを特定できませんでした。bars の実フィールド例: "
-                    f"{sample_keys}"
-                )
             raise RuntimeError(
                 "J-Quants から売買代金データを取得できませんでした。"
                 "認証・プラン・営業日を確認してください。"
