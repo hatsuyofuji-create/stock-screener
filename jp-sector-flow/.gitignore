@@ -1,0 +1,12 @@
+# 秘密情報
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# 生成物・ログ
+logs/*.log
+db/*.csv
+db/*.json

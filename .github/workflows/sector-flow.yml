@@ -1,0 +1,52 @@
+# セクター資金フローの日次更新（クラウド自動実行の選択肢）
+#
+# 手元のPCで cron/launchd/タスクスケジューラを使わず、GitHub 上で毎営業日
+# 更新＋LINE通知したい場合に使う。ローカル運用だけなら無効化してよい。
+#
+# 事前に GitHub リポジトリの Settings → Secrets and variables → Actions で
+# 次のシークレットを登録:
+#   J-Quants（どちらか）:
+#     - JQUANTS_MAILADDRESS ＋ JQUANTS_PASSWORD（おすすめ・毎回自動でトークン発行）
+#     - もしくは JQUANTS_REFRESH_TOKEN（週1で失効するので自動運用には不向き）
+#   LINE（任意・未設定ならログ出力にフォールバック）:
+#     - LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID
+name: sector-flow-daily
+
+on:
+  schedule:
+    # 平日 09:30 UTC = 18:30 JST（引け後）
+    - cron: "30 9 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jp-sector-flow
+    env:
+      PROVIDER: jquants
+      JQUANTS_MAILADDRESS: ${{ secrets.JQUANTS_MAILADDRESS }}
+      JQUANTS_PASSWORD: ${{ secrets.JQUANTS_PASSWORD }}
+      JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run daily update
+        run: python update_daily.py
+      - name: Save results
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -f db/turnover.csv db/ranking.csv db/monthly.csv db/meta.json
+          git commit -m "update sector-flow results" || echo "no changes"
+          git push

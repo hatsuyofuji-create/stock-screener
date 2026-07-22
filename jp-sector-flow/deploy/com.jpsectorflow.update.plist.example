@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS launchd テンプレート（cron が使いにくい場合）。
+  1. /ABSOLUTE/PATH を実際の絶対パスに置換
+  2. ~/Library/LaunchAgents/com.jpsectorflow.update.plist として保存
+  3. launchctl load ~/Library/LaunchAgents/com.jpsectorflow.update.plist
+  平日18:30 に run_update.sh を実行する。
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jpsectorflow.update</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/ABSOLUTE/PATH/jp-sector-flow/run_update.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PROVIDER</key>
+    <string>jquants</string>
+  </dict>
+
+  <!-- 平日(月=1 … 金=5) 18:30 -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/ABSOLUTE/PATH/jp-sector-flow/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/ABSOLUTE/PATH/jp-sector-flow/logs/launchd.err.log</string>
+</dict>
+</plist>
