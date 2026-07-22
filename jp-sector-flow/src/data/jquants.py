@@ -142,9 +142,9 @@ class JQuantsProvider(DataProvider):
             values: dict[str, float] = {}
             for row in rows:
                 code = str(self._first(row, "Code", "code", "LocalCode") or "").strip()
+                # V2 bars は超短縮名: Va = Value（売買代金）, Vo = Volume
                 t = self._first(
-                    row, "TurnoverValue", "turnoverValue", "Turnover",
-                    "TrdVal", "TVal", "Val", "TradingValue",
+                    row, "Va", "TurnoverValue", "turnoverValue", "Turnover", "Val",
                 )
                 if code and t is not None:
                     values[code] = float(t)
