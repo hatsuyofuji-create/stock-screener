@@ -40,10 +40,13 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run daily update
         run: python update_daily.py
+      - name: Render public page
+        run: python render_page.py   # docs/sector-flow/index.html を生成（GitHub Pages 公開用）
       - name: Save results
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add -f db/turnover.csv db/ranking.csv db/monthly.csv db/meta.json
-          git commit -m "update sector-flow results" || echo "no changes"
+          git add -f ../docs/sector-flow/index.html
+          git commit -m "update sector-flow results & page" || echo "no changes"
           git push
