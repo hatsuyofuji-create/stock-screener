@@ -71,64 +71,99 @@ class JQuantsProvider(DataProvider):
             params["pagination_key"] = nxt
         return out
 
+    @staticmethod
+    def _first(row: dict, *names: str):
+        """候補のフィールド名から最初に見つかった非空の値を返す。"""
+        for n in names:
+            v = row.get(n)
+            if v is not None and v != "":
+                return v
+        return None
+
+    @staticmethod
+    def _find_sector(row: dict):
+        """33業種名を柔軟に探す（フィールド名の揺れに対応）。"""
+        v = JQuantsProvider._first(
+            row, "Sector33CodeName", "Sector33Name", "sector33CodeName", "sector33Name"
+        )
+        if v:
+            return v
+        # 総当たり: 名前に Sector33/業種 を含み Name/名 で終わるキー
+        for k, val in row.items():
+            if val and ("Sector33" in k or "33業種" in k) and ("Name" in k or "名" in k):
+                return val
+        return JQuantsProvider._first(row, "Sector17CodeName", "Sector17Name")
+
     # ------------------------------------------------------------ セクター表
     def get_sector_map(self) -> dict[str, str]:
-        """/listed/info から 銘柄コード -> 33業種名（東証33業種）の対応を作る。"""
+        """/equities/master から 銘柄コード -> 33業種名（東証33業種）の対応を作る（V2）。"""
         if self._sector_map:
             return dict(self._sector_map)
 
-        rows = self._get_paginated("/listed/info", {}, key="info")
+        rows = self._get_paginated("/equities/master", {}, key="data")
+        if not rows:
+            raise RuntimeError("J-Quants /equities/master が空でした。")
         smap: dict[str, str] = {}
         for row in rows:
-            code = str(row.get("Code", "")).strip()
-            sector = (
-                row.get("Sector33CodeName")
-                or row.get("Sector17CodeName")
-                or "その他"
-            )
+            code = str(self._first(row, "Code", "code", "LocalCode") or "").strip()
+            sector = self._find_sector(row) or "その他"
             if code:
                 smap[code] = sector
+        # 業種名が取れず全部「その他」なら、実際のフィールド名をログに出して気づけるように
+        if len(set(smap.values())) <= 1:
+            raise RuntimeError(
+                "33業種名フィールドを特定できませんでした。master の実フィールド例: "
+                f"{list(rows[0].keys())}"
+            )
         self._sector_map = smap
         return dict(smap)
 
     # ------------------------------------------------------------ 売買代金履歴
     def get_turnover_history(self) -> pd.DataFrame:
         """
-        直近 lookback_days 営業日の売買代金テーブル（日付 × 銘柄コード, 円）を返す。
-        daily_quotes の TurnoverValue（売買代金）を採用する。
-        日付ごとに /prices/daily_quotes?date=YYYY-MM-DD を叩くので、
-        呼び出し回数 = 概ね営業日数。レート制限に配慮して少し待つ。
+        直近 lookback_days 営業日の売買代金テーブル（日付 × 銘柄コード, 円）を返す（V2）。
+        /equities/bars/daily の TurnoverValue（売買代金）を採用する。
+        日付ごとに ?date=YYYY-MM-DD を叩くので、呼び出し回数 = 概ね営業日数。
         """
-        self.get_sector_map()  # 先にセクター表を用意（トークンも温まる）
+        self.get_sector_map()  # 先にセクター表を用意
 
-        # 余裕を持って多めの暦日を候補にし、データが返った日だけ採用する
         cal = pd.bdate_range(
             end=pd.Timestamp.today().normalize(),
             periods=int(self.lookback_days * 1.6) + 5,
         )
         series_by_date: dict[pd.Timestamp, pd.Series] = {}
         got = 0
+        saw_rows_no_value = False
+        sample_keys: list[str] = []
         for day in reversed(cal):  # 新しい日から遡って必要日数だけ集める
             ymd = day.strftime("%Y-%m-%d")
             rows = self._get_paginated(
-                "/prices/daily_quotes", {"date": ymd}, key="daily_quotes"
+                "/equities/bars/daily", {"date": ymd}, key="data"
             )
             time.sleep(0.25)  # レート制限対策
             if not rows:
                 continue  # 休場日など
             values: dict[str, float] = {}
             for row in rows:
-                code = str(row.get("Code", "")).strip()
-                t = row.get("TurnoverValue")  # 売買代金（円）
+                code = str(self._first(row, "Code", "code", "LocalCode") or "").strip()
+                t = self._first(row, "TurnoverValue", "turnoverValue", "Turnover")
                 if code and t is not None:
                     values[code] = float(t)
             if values:
                 series_by_date[day] = pd.Series(values)
                 got += 1
+            elif not saw_rows_no_value:
+                saw_rows_no_value = True
+                sample_keys = list(rows[0].keys())
             if got >= self.lookback_days:
                 break
 
         if not series_by_date:
+            if saw_rows_no_value:
+                raise RuntimeError(
+                    "売買代金フィールドを特定できませんでした。bars の実フィールド例: "
+                    f"{sample_keys}"
+                )
             raise RuntimeError(
                 "J-Quants から売買代金データを取得できませんでした。"
                 "認証・プラン・営業日を確認してください。"
