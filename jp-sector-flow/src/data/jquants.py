@@ -1,28 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-JQuantsProvider: J-Quants API（Lightプラン）からデータを取得する提供元。
+JQuantsProvider: J-Quants API（V2）からデータを取得する提供元。
 
-■ 認証について（公式ドキュメントで確認済み・2026-07 時点）
-  J-Quants は「APIキーをヘッダに直接入れる」方式ではなく、
-  次の3段階の Bearer 認証です:
+■ 認証について（V2・2026-07 時点）
+  2025-12-22 以降に登録したアカウントは V2 のみ。V1 のトークン方式
+  （/token/auth_user → /token/auth_refresh → Bearer）は廃止され、
+  **APIキー方式**に変わった（V1 エンドポイントは 410 Gone を返す）。
 
-    1. リフレッシュトークンを入手する
-       - ダッシュボードで発行したものをそのまま使う（JQUANTS_REFRESH_TOKEN）
-       - もしくは メール/パスワードで POST /token/auth_user して取得
-    2. リフレッシュトークンで POST /token/auth_refresh し、IDトークンを得る
-    3. データ取得時に Authorization: Bearer <IDトークン> を付ける
+  使い方はシンプル:
+    - ダッシュボードで「APIキー」を発行する
+    - すべてのリクエストに  x-api-key: <APIキー>  ヘッダを付けるだけ
+    - ベースURLは https://api.jquants.com/v2
 
-  ・リフレッシュトークン: 有効期限 約1週間
-  ・IDトークン: 有効期限 約24時間
-  ・Lightプランのベースは https://api.jquants.com/v1
-
-  参考: https://jpx.gitbook.io/j-quants-en/outline/getstarted
-        https://jpx.gitbook.io/j-quants-en/api-reference/idtoken
-
-  ※ 指示書には「V2はAPIキー方式」とありましたが、公式ドキュメント上は上記の
-     リフレッシュトークン→IDトークン→Bearer 方式のままです。ダッシュボードの
-     「APIキー」は実質リフレッシュトークンとして扱えるため、
-     JQUANTS_REFRESH_TOKEN に入れれば動作します。
+  参考: https://jpx-jquants.com/en/spec/migration-v1-v2
 """
 
 from __future__ import annotations
@@ -42,57 +32,26 @@ class JQuantsProvider(DataProvider):
     name = "jquants"
 
     def __init__(self) -> None:
-        self.base = (os.getenv("JQUANTS_BASE") or "https://api.jquants.com/v1").rstrip("/")
+        self.base = (os.getenv("JQUANTS_BASE") or "https://api.jquants.com/v2").rstrip("/")
         self.lookback_days = int(os.getenv("JQUANTS_LOOKBACK_DAYS", "250"))
-        self._id_token: str | None = None
         self._session = requests.Session()
         self._sector_map: dict[str, str] = {}
 
     # ------------------------------------------------------------------ 認証
-    def _get_refresh_token(self) -> str:
-        """リフレッシュトークンを取得（直接指定 or メール/パスワードから発行）。"""
-        token = os.getenv("JQUANTS_REFRESH_TOKEN", "").strip()
-        if token:
-            return token
-
-        mail = os.getenv("JQUANTS_MAILADDRESS", "").strip()
-        pw = os.getenv("JQUANTS_PASSWORD", "").strip()
-        if not (mail and pw):
+    def _headers(self) -> dict[str, str]:
+        """V2 の APIキー認証ヘッダ（x-api-key）を返す。"""
+        key = os.getenv("JQUANTS_API_KEY", "").strip()
+        if not key:
             raise RuntimeError(
-                "J-Quants の認証情報がありません。"
-                "JQUANTS_REFRESH_TOKEN、または JQUANTS_MAILADDRESS/JQUANTS_PASSWORD を "
-                ".env に設定してください。"
+                "J-Quants の APIキーがありません。ダッシュボードで発行した "
+                "APIキーを JQUANTS_API_KEY に設定してください（V2 は APIキー方式）。"
             )
-        r = self._session.post(
-            f"{self.base}/token/auth_user",
-            json={"mailaddress": mail, "password": pw},
-            timeout=_TIMEOUT,
-        )
-        r.raise_for_status()
-        rt = r.json().get("refreshToken")
-        if not rt:
-            raise RuntimeError(f"リフレッシュトークンを取得できませんでした: {r.text[:200]}")
-        return rt
-
-    def _auth_headers(self) -> dict[str, str]:
-        """IDトークンを取得し、Bearer 認証ヘッダを返す（キャッシュあり）。"""
-        if self._id_token is None:
-            refresh = self._get_refresh_token()
-            r = self._session.post(
-                f"{self.base}/token/auth_refresh",
-                params={"refreshtoken": refresh},
-                timeout=_TIMEOUT,
-            )
-            r.raise_for_status()
-            self._id_token = r.json().get("idToken")
-            if not self._id_token:
-                raise RuntimeError(f"IDトークンを取得できませんでした: {r.text[:200]}")
-        return {"Authorization": f"Bearer {self._id_token}"}
+        return {"x-api-key": key}
 
     # -------------------------------------------------------------- 取得補助
     def _get_paginated(self, path: str, params: dict, key: str) -> list[dict]:
         """pagination_key に対応した GET。key で指定した配列を全ページ連結して返す。"""
-        headers = self._auth_headers()
+        headers = self._headers()
         out: list[dict] = []
         params = dict(params)
         while True:

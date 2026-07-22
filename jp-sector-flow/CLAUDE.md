@@ -46,22 +46,19 @@ jp-sector-flow/
 - 提供元は環境変数 `PROVIDER`（`mock` / `jquants`）で切り替え。
 - J-Quants は `daily_quotes` の `TurnoverValue`（売買代金）を採用。
 
-### J-Quants の認証（重要）
+### J-Quants の認証（重要・V2 APIキー方式）
 
-公式ドキュメント（2026-07 時点）で確認済み。**APIキー直挿しではなく** 3段階:
+2025-12-22 以降のアカウントは **V2** のみ。旧トークン方式は廃止され
+（`/v1/token/auth_user` は 410 Gone）、**APIキー方式**に変わった:
 
-1. リフレッシュトークンを入手（`JQUANTS_REFRESH_TOKEN`、または
-   `POST /token/auth_user` にメール/パスワード）
-2. `POST /token/auth_refresh?refreshtoken=...` で **IDトークン**（有効約24h）
-3. データ取得時に `Authorization: Bearer <IDトークン>`
+1. ダッシュボードで **APIキー** を発行し、`JQUANTS_API_KEY` に設定
+2. すべてのリクエストに `x-api-key: <APIキー>` ヘッダを付ける（トークン交換なし）
 
-- Light プランのベース: `https://api.jquants.com/v1`
-- 参考: <https://jpx.gitbook.io/j-quants-en/outline/getstarted>,
-  <https://jpx.gitbook.io/j-quants-en/api-reference/idtoken>
+- ベース: `https://api.jquants.com/v2`（`JQUANTS_BASE` で上書き可）
+- 参考: <https://jpx-jquants.com/en/spec/migration-v1-v2>
 
-> 指示書には「V2はAPIキー方式」とあったが、公式は上記 Bearer 方式のまま。
-> ダッシュボードの「APIキー」は実質リフレッシュトークンとして
-> `JQUANTS_REFRESH_TOKEN` に入れれば動く。
+> 当初は V1（リフレッシュトークン→IDトークン→Bearer）で実装したが、実アカウントで
+> 410 Gone となり V2 APIキー方式へ移行。指示書の「V2はAPIキー方式」が正しかった。
 
 ## 計算（money_flow.compute）
 

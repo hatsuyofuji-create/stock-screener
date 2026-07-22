@@ -31,21 +31,20 @@ streamlit run app.py               # → ランキングと推移グラフ。確
 
 ```bash
 cp .env.example .env
-# .env を編集して JQUANTS_REFRESH_TOKEN を記入（下の「認証」参照）
+# .env を編集して JQUANTS_API_KEY を記入（下の「認証」参照）
 PROVIDER=jquants python update_daily.py
 ```
 
-### J-Quants の認証について
+### J-Quants の認証について（V2・APIキー方式）
 
-J-Quants は **APIキー直挿しではなく**、リフレッシュトークン → IDトークン →
-`Authorization: Bearer` の方式です（公式ドキュメントで確認済み）。
+2025-12-22 以降に登録したアカウントは **V2** のみで、認証は **APIキー方式**です
+（旧トークン方式 `/token/auth_user` は廃止＝410 Gone）。
 
-- ダッシュボードで発行した値を `JQUANTS_REFRESH_TOKEN` に入れる
-  （ダッシュボードの「APIキー」は実質リフレッシュトークンとして使えます）
-- または `JQUANTS_MAILADDRESS` / `JQUANTS_PASSWORD` を入れると自動発行します
-- Light プランのベースは `https://api.jquants.com/v1`（`.env` で変更可）
-- 401/403 が出たら、トークンの有効期限（リフレッシュ約1週間 / ID約24時間）と
-  プランを確認してください。
+- J-Quants の**ダッシュボードで「APIキー」を発行**し、`JQUANTS_API_KEY` に入れる
+- すべてのリクエストに `x-api-key: <APIキー>` ヘッダが付きます（コードが自動で付与）
+- ベースURLは `https://api.jquants.com/v2`（`.env` の `JQUANTS_BASE` で変更可）
+- 401/403 が出たら、APIキーとプラン（利用可能なデータ範囲）を確認してください。
+- 参考: <https://jpx-jquants.com/en/spec/migration-v1-v2>
 
 ## 3. LINE 通知の設定
 
