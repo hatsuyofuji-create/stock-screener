@@ -5,9 +5,8 @@
 #
 # 事前に GitHub リポジトリの Settings → Secrets and variables → Actions で
 # 次のシークレットを登録:
-#   J-Quants（どちらか）:
-#     - JQUANTS_MAILADDRESS ＋ JQUANTS_PASSWORD（おすすめ・毎回自動でトークン発行）
-#     - もしくは JQUANTS_REFRESH_TOKEN（週1で失効するので自動運用には不向き）
+#   J-Quants（V2・APIキー方式）:
+#     - JQUANTS_API_KEY（ダッシュボードで発行したAPIキー）
 #   LINE（任意・未設定ならログ出力にフォールバック）:
 #     - LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID
 name: sector-flow-daily
@@ -29,9 +28,7 @@ jobs:
         working-directory: jp-sector-flow
     env:
       PROVIDER: jquants
-      JQUANTS_MAILADDRESS: ${{ secrets.JQUANTS_MAILADDRESS }}
-      JQUANTS_PASSWORD: ${{ secrets.JQUANTS_PASSWORD }}
-      JQUANTS_REFRESH_TOKEN: ${{ secrets.JQUANTS_REFRESH_TOKEN }}
+      JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
     steps:
