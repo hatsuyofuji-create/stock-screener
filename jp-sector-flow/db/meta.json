@@ -1,0 +1,13 @@
+{
+  "updated_at": "2026-07-22T13:49:40",
+  "provider": "jquants",
+  "asof": "2026-07-22",
+  "metric": "turnover_oku",
+  "n_sectors": 34,
+  "n_days": 250,
+  "top": [
+    "電気機器",
+    "情報･通信業",
+    "銀行業"
+  ]
+}
