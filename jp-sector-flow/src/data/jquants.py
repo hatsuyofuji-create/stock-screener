@@ -58,7 +58,11 @@ class JQuantsProvider(DataProvider):
             r = self._session.get(
                 f"{self.base}{path}", params=params, headers=headers, timeout=_TIMEOUT
             )
-            r.raise_for_status()
+            if r.status_code >= 400:
+                # J-Quants が返すエラー本文をそのまま見せて原因を切り分けやすくする
+                raise RuntimeError(
+                    f"J-Quants API {r.status_code} {self.base}{path} : {r.text[:400]}"
+                )
             body = r.json()
             out.extend(body.get(key, []))
             nxt = body.get("pagination_key")
