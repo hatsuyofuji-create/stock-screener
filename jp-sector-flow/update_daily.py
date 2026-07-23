@@ -36,6 +36,9 @@ from src.notify import line as line_notify  # noqa: E402
 DB_DIR = ROOT / "db"
 TOP_N = 3  # 通知に載せる上位セクター数
 
+# LINE通知に載せる「グラフ・全業種ランキング」ページのURL（環境変数で上書き可）
+PAGE_URL = os.getenv("PAGE_URL") or "https://hatsuyofuji-create.github.io/stock-screener/sector-flow/"
+
 
 def is_weekday(d: date | None = None) -> bool:
     """平日（月〜金）なら True。
@@ -61,6 +64,9 @@ def _build_message(ranking, asof) -> str:
             f"{int(row['rank'])}. {row['sector']}　{row['turnover']:,.0f}億円\n"
             f"　　{_direction(row.get('price_mom'))}"
         )
+    lines.append("")
+    lines.append("📈 グラフ・全業種ランキング:")
+    lines.append(PAGE_URL)
     return "\n".join(lines)
 
 
