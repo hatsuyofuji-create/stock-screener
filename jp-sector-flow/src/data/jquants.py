@@ -36,6 +36,8 @@ class JQuantsProvider(DataProvider):
         self.lookback_days = int(os.getenv("JQUANTS_LOOKBACK_DAYS", "250"))
         self._session = requests.Session()
         self._sector_map: dict[str, str] = {}
+        self._turnover_df: pd.DataFrame | None = None
+        self._close_df: pd.DataFrame | None = None
 
     # ------------------------------------------------------------------ 認証
     def _headers(self) -> dict[str, str]:
@@ -116,20 +118,23 @@ class JQuantsProvider(DataProvider):
         self._sector_map = smap
         return dict(smap)
 
-    # ------------------------------------------------------------ 売買代金履歴
-    def get_turnover_history(self) -> pd.DataFrame:
+    # ------------------------------------------------------ 売買代金＋終値履歴
+    def _fetch_bars(self) -> None:
         """
-        直近 lookback_days 営業日の売買代金テーブル（日付 × 銘柄コード, 円）を返す（V2）。
-        /equities/bars/daily の TurnoverValue（売買代金）を採用する。
-        日付ごとに ?date=YYYY-MM-DD を叩くので、呼び出し回数 = 概ね営業日数。
+        直近 lookback_days 営業日ぶんの日次バーを1回だけ取得し、
+        売買代金（Va）と終値（AdjC/C）の2テーブルを同時に作る（API呼び出しは1系統）。
+        /equities/bars/daily を日付ごとに叩く（呼び出し回数 = 概ね営業日数）。
         """
+        if self._turnover_df is not None:
+            return
         self.get_sector_map()  # 先にセクター表を用意
 
         cal = pd.bdate_range(
             end=pd.Timestamp.today().normalize(),
             periods=int(self.lookback_days * 1.6) + 5,
         )
-        series_by_date: dict[pd.Timestamp, pd.Series] = {}
+        turn_by_date: dict[pd.Timestamp, pd.Series] = {}
+        close_by_date: dict[pd.Timestamp, pd.Series] = {}
         got = 0
         for day in reversed(cal):  # 新しい日から遡って必要日数だけ集める
             ymd = day.strftime("%Y-%m-%d")
@@ -139,17 +144,23 @@ class JQuantsProvider(DataProvider):
             time.sleep(0.25)  # レート制限対策
             if not rows:
                 continue  # 休場日など
-            values: dict[str, float] = {}
+            tvals: dict[str, float] = {}
+            cvals: dict[str, float] = {}
             for row in rows:
                 code = str(self._first(row, "Code", "code", "LocalCode") or "").strip()
-                # V2 bars は超短縮名: Va = Value（売買代金）, Vo = Volume
-                t = self._first(
-                    row, "Va", "TurnoverValue", "turnoverValue", "Turnover", "Val",
-                )
-                if code and t is not None:
-                    values[code] = float(t)
-            if values:
-                series_by_date[day] = pd.Series(values)
+                if not code:
+                    continue
+                # V2 bars は超短縮名: Va=Value(売買代金), Vo=Volume, C=Close, AdjC=調整後終値
+                t = self._first(row, "Va", "TurnoverValue", "turnoverValue", "Turnover", "Val")
+                c = self._first(row, "AdjC", "C", "Close", "AdjustmentClose")
+                if t is not None:
+                    tvals[code] = float(t)
+                if c is not None:
+                    cvals[code] = float(c)
+            if tvals:
+                turn_by_date[day] = pd.Series(tvals)
+                if cvals:
+                    close_by_date[day] = pd.Series(cvals)
                 got += 1
             else:
                 # データはあるのに売買代金が取れない = フィールド名違い。即座に実名を出す。
@@ -160,12 +171,23 @@ class JQuantsProvider(DataProvider):
             if got >= self.lookback_days:
                 break
 
-        if not series_by_date:
+        if not turn_by_date:
             raise RuntimeError(
                 "J-Quants から売買代金データを取得できませんでした。"
                 "認証・プラン・営業日を確認してください。"
             )
 
-        df = pd.DataFrame(series_by_date).T.sort_index()
-        df.index.name = "Date"
-        return df
+        self._turnover_df = pd.DataFrame(turn_by_date).T.sort_index()
+        self._turnover_df.index.name = "Date"
+        self._close_df = pd.DataFrame(close_by_date).T.sort_index()
+        self._close_df.index.name = "Date"
+
+    def get_turnover_history(self) -> pd.DataFrame:
+        self._fetch_bars()
+        assert self._turnover_df is not None
+        return self._turnover_df.copy()
+
+    def get_close_history(self) -> pd.DataFrame:
+        self._fetch_bars()
+        assert self._close_df is not None
+        return self._close_df.copy()

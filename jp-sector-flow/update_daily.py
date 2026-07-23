@@ -22,6 +22,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+import pandas as pd
 from dotenv import load_dotenv
 
 # src をパスに通す
@@ -44,13 +45,21 @@ def is_weekday(d: date | None = None) -> bool:
     return d.weekday() < 5
 
 
+def _direction(price_mom) -> str:
+    """価格の勢いから買い/売り優勢の表示を作る。"""
+    if price_mom is None or pd.isna(price_mom):
+        return "— 方向不明"
+    if price_mom >= 0:
+        return f"🟢買い優勢 +{price_mom:.1f}%"
+    return f"🔴売り優勢 {price_mom:.1f}%"
+
+
 def _build_message(ranking, asof) -> str:
-    lines = [f"📊 セクター売買代金 {asof.strftime('%Y-%m-%d')}", "上位業種（売買代金）:"]
+    lines = [f"📊 セクター資金フロー {asof.strftime('%Y-%m-%d')}", "売買代金 上位業種（＋価格の方向）:"]
     for _, row in ranking.head(TOP_N).iterrows():
-        arrow = "↑" if row["momentum"] >= 0 else "↓"
         lines.append(
-            f"{int(row['rank'])}. {row['sector']} "
-            f"（{row['turnover']:,.0f}億円 / 勢い {row['momentum']:+.1f}% {arrow}）"
+            f"{int(row['rank'])}. {row['sector']}　{row['turnover']:,.0f}億円\n"
+            f"　　{_direction(row.get('price_mom'))}"
         )
     return "\n".join(lines)
 
@@ -66,10 +75,11 @@ def main() -> int:
     print(f"データ提供元: {provider.name}")
 
     turnover = provider.get_turnover_history()
+    close = provider.get_close_history()
     sector_map = provider.get_sector_map()
     print(f"取得: {turnover.shape[1]} 銘柄 / {turnover.shape[0]} 営業日")
 
-    result = flow_mod.compute(turnover, sector_map)
+    result = flow_mod.compute(turnover, sector_map, close=close)
     flow_df = result["flow"]
     ranking = result["ranking"]
     monthly = result["monthly"]

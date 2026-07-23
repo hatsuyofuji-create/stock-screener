@@ -97,7 +97,7 @@
 <div class="wrap">
   <div class="eyebrow">日本株 · セクター資金フロー · 売買代金 · 東証33業種</div>
   <h1>どの業種にお金が動いているか</h1>
-  <p class="lede">東証<b>33業種</b>それぞれの<b>売買代金</b>（実際に売買された金額・億円）。金額が大きい業種ほど、多くのお金がその業種で動いている＝資金が入っている、と読みます。毎営業日この画面が更新され、上位はLINEにも届く想定です。</p>
+  <p class="lede">東証<b>33業種</b>それぞれの<b>売買代金</b>（実際に売買された金額・億円）＝どれだけ活発かを表します。ただし売買代金は買い・売りの合計なので、<b>価格の方向（🟢買い優勢／🔴売り優勢）</b>を併記します。<b>活発（売買代金 大）×買い優勢</b>＝本当に資金が入っている、と読めます。毎営業日この画面が更新され、上位はLINEにも届きます。</p>
   <div class="meta">
     <span class="badge">● 実データ（J-Quants V2）</span>
     <span>基準日 <b id="m-asof"></b></span>
@@ -107,7 +107,7 @@
 
   <section class="card">
     <h2>今日の資金フロー 上位3業種（売買代金）</h2>
-    <p class="sub">売買代金（億円）が大きい順。勢い＝直近5営業日の増減</p>
+    <p class="sub">売買代金（億円）が大きい順。価格の方向＝直近5営業日の株価変化（🟢買い優勢／🔴売り優勢）</p>
     <div class="tiles" id="tiles"></div>
   </section>
 
@@ -129,17 +129,18 @@
 
   <section class="card">
     <h2>全34業種 ランキング（売買代金）</h2>
-    <p class="sub">売買代金（億円）の大きい順。行をクリックでグラフの色つき表示を切替。</p>
+    <p class="sub">売買代金（億円）の大きい順。右列は<b>価格の方向</b>（🟢買い優勢／🔴売り優勢＝直近5営業日の株価変化）。行をクリックでグラフの色つき表示を切替。</p>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>#</th><th>業種</th><th>売買代金（億円）</th><th>勢い（5日）</th></tr></thead>
+        <thead><tr><th>#</th><th>業種</th><th>売買代金（億円）</th><th>価格の方向（5日）</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
   </section>
 
   <div class="foot">
-    <p><b>J-Quants の実データです。</b> 東証33業種＋分類外「その他」の売買代金（V2の <code>Va</code>）を集計し、毎営業日 GitHub Actions が自動更新して倉庫に保存します。売買代金は日々の振れを抑えるため5営業日移動平均で表示。<b>電気機器は売買代金が突出して大きい</b>ため、初期グラフからは外しています（表の行クリックで追加できます）。グラフの縦目盛りは「色つき表示中の業種」に合わせて自動調整します。</p>
+    <p><b>J-Quants の実データです。</b> 東証33業種＋分類外「その他」の売買代金（V2の <code>Va</code>）＝活発さと、株価（<code>AdjC</code>）から求めた<b>価格の方向（🟢買い優勢／🔴売り優勢＝直近5営業日の株価変化）</b>を、毎営業日 GitHub Actions が自動更新して倉庫に保存します。売買代金は5営業日移動平均で表示。<b>電気機器は売買代金が突出して大きい</b>ため初期グラフからは外しています（表の行クリックで追加）。縦目盛りは色つき表示中の業種に合わせて自動調整します。</p>
+    <p>※ 売買代金は買い・売りの合計なので「活発さ」の指標です。買われているか売られているかは「価格の方向」で判断します（活発×買い優勢＝資金流入と読めます）。</p>
     <p>投資判断・売買の推奨を行うものではありません（表示専用）。</p>
   </div>
 </div>
@@ -166,11 +167,15 @@ _cand.slice(0,5).forEach((r,i)=> slot.set(r.sector, i));
 $('#m-asof').textContent = D.dates[D.dates.length-1];
 $('#m-range').textContent = D.dates[0] + ' 〜 ' + D.dates[D.dates.length-1];
 
+// 価格の方向（買い/売り優勢）の表示
+const hasPM = pm => pm!==null && pm!==undefined && !isNaN(pm);
+const dirText = pm => !hasPM(pm) ? '— 不明' : (pm>=0 ? `🟢買い優勢 +${(+pm).toFixed(1)}%` : `🔴売り優勢 ${(+pm).toFixed(1)}%`);
+const dirCls = pm => !hasPM(pm) ? '' : (pm>=0 ? 'up' : 'down');
+
 $('#tiles').innerHTML = D.ranking.slice(0,3).map(r=>{
-  const up=r.momentum>=0;
   return `<div class="tile"><div class="rk">第${r.rank}位</div><div class="nm">${r.sector}</div>
     <div class="big">${fmt(r.turnover)}<span class="u">億円</span></div>
-    <div class="row"><span>勢い（5日）</span><span class="mom ${up?'up':'down'}">${up?'▲':'▼'} ${up?'+':''}${r.momentum.toFixed(2)}%</span></div></div>`;
+    <div class="row"><span>価格の方向</span><span class="mom ${dirCls(r.price_mom)}">${dirText(r.price_mom)}</span></div></div>`;
 }).join('');
 
 function firstFreeSlot(){ const u=new Set(slot.values()); for(let i=0;i<MAX;i++) if(!u.has(i)) return i; return -1; }
@@ -186,12 +191,12 @@ function toggle(sector){
 
 function renderTable(){
   $('#tbody').innerHTML = D.ranking.map(r=>{
-    const on=slot.has(r.sector), up=r.momentum>=0;
+    const on=slot.has(r.sector);
     const dot = on ? `<span class="dot filled" style="background:${slotColor(slot.get(r.sector))}"></span>` : `<span class="dot"></span>`;
     return `<tr class="${on?'on':''}" data-s="${r.sector.replace(/"/g,'&quot;')}">
       <td>${r.rank}</td><td><span class="snm">${dot}${r.sector}</span></td>
       <td>${fmt(r.turnover)}</td>
-      <td class="${up?'up':'down'}"><span class="pill">${up?'▲':'▼'} ${up?'+':''}${r.momentum.toFixed(2)}%</span></td></tr>`;
+      <td class="${dirCls(r.price_mom)}"><span class="pill">${dirText(r.price_mom)}</span></td></tr>`;
   }).join('');
   $('#tbody').querySelectorAll('tr').forEach(tr=> tr.addEventListener('click',()=>toggle(tr.dataset.s)));
 }
@@ -290,14 +295,14 @@ function doMove(e){
   let best=null,bd=Infinity;
   SECTORS.forEach(s=>{ const d=Math.abs(D.series[s][i]-cursVal); if(d<bd){bd=d;best=s;} });
   render(best, i);
-  const rk=rankOf[best], up=rk.momentum>=0, val=D.series[best][i];
+  const rk=rankOf[best], val=D.series[best][i];
   const col = slot.has(best) ? slotColor(slot.get(best)) : 'var(--accent)';
   readout.innerHTML =
     `<span class="ro-date">${D.dates[i]}</span>`+
     `<span class="ro-sec"><span class="sw" style="background:${col}"></span>${best}</span>`+
     `<span class="ro-val">${fmt(val)}<span class="u">億円</span></span>`+
     `<span class="ro-rank">売買代金 第${rk.rank}位</span>`+
-    `<span class="ro-mom ${up?'up':'down'}">勢い ${up?'+':''}${rk.momentum.toFixed(2)}%</span>`;
+    `<span class="ro-mom ${dirCls(rk.price_mom)}">${dirText(rk.price_mom)}</span>`;
 }
 svg.addEventListener('mousemove',onMove);
 svg.addEventListener('mouseleave',()=>{ if(raf){cancelAnimationFrame(raf);raf=0;} render(null); resetReadout(); });

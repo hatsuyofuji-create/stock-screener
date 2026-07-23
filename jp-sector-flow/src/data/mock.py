@@ -61,6 +61,7 @@ class MockProvider(DataProvider):
         self.days = days
         self.seed = seed
         self._turnover: pd.DataFrame | None = None
+        self._close: pd.DataFrame | None = None
         self._sector: dict[str, str] = {}
         self._build()
 
@@ -72,7 +73,8 @@ class MockProvider(DataProvider):
         # 進捗 0→1（ゆるやかなトレンドを掛けるための時間軸）
         t = np.linspace(0.0, 1.0, self.days)
 
-        cols: dict[str, np.ndarray] = {}
+        cols: dict[str, np.ndarray] = {}       # 売買代金（円）
+        price_cols: dict[str, np.ndarray] = {}  # 終値（円）
         sector_map: dict[str, str] = {}
         code = 1000
         for _s_idx, sector in enumerate(_SECTORS):
@@ -82,20 +84,31 @@ class MockProvider(DataProvider):
             drift_total = rng.normal(0.0, 0.35)   # 1年での対数変化（±約35%）
             trend = np.exp(drift_total * t)       # 1.0 → exp(drift_total)
             jitter = 0.13 + rng.random() * 0.06   # 日々のばらつき幅
+            # 価格は別のドリフト（買い/売り優勢の方向をデモで出すため）
+            price_drift = rng.normal(0.0002, 0.0006)
+            price_vol = 0.012 + rng.random() * 0.006
             for _ in range(_TICKERS_PER_SECTOR):
                 code += 1
                 ticker = str(code)
                 noise = np.exp(rng.normal(0.0, jitter, size=self.days))  # 非累積の日次ノイズ
                 level = base_oku * 1e8 * trend * noise  # 円ベースの売買代金
                 cols[ticker] = level
+                rets = rng.normal(price_drift, price_vol, size=self.days)
+                price = 1000.0 * np.exp(np.cumsum(rets))  # 終値（累積＝トレンドを持つ）
+                price_cols[ticker] = price
                 sector_map[ticker] = sector
 
         self._turnover = pd.DataFrame(cols, index=dates).round(0)
+        self._close = pd.DataFrame(price_cols, index=dates).round(2)
         self._sector = sector_map
 
     def get_turnover_history(self) -> pd.DataFrame:
         assert self._turnover is not None
         return self._turnover.copy()
+
+    def get_close_history(self) -> pd.DataFrame:
+        assert self._close is not None
+        return self._close.copy()
 
     def get_sector_map(self) -> dict[str, str]:
         return dict(self._sector)
