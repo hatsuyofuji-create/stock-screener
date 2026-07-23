@@ -10,6 +10,7 @@ notify_test.py — LINE通知だけを素早く試すためのテスト送信。
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +39,7 @@ def main() -> int:
             return "— 方向不明"
         return f"🟢買い優勢 +{pm:.1f}%" if pm >= 0 else f"🔴売り優勢 {pm:.1f}%"
 
+    page_url = os.getenv("PAGE_URL") or "https://hatsuyofuji-create.github.io/stock-screener/sector-flow/"
     lines = [f"📊 セクター資金フロー {asof}（テスト送信）", "売買代金 上位業種（＋価格の方向）:"]
     for _, r in rank.head(TOP_N).iterrows():
         pm = r["price_mom"] if "price_mom" in r else None
@@ -45,6 +47,9 @@ def main() -> int:
             f"{int(r['rank'])}. {r['sector']}　{r['turnover']:,.0f}億円\n"
             f"　　{direction(pm)}"
         )
+    lines.append("")
+    lines.append("📈 グラフ・全業種ランキング:")
+    lines.append(page_url)
     message = "\n".join(lines)
 
     sent = line_notify.notify(message)
