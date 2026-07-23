@@ -33,6 +33,11 @@ class DataProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_close_history(self) -> pd.DataFrame:
+        """日付 × 銘柄コードの終値テーブルを返す（価格の方向＝買い/売りの判定用）。"""
+        raise NotImplementedError
+
+    @abstractmethod
     def get_sector_map(self) -> dict[str, str]:
         """銘柄コード -> セクター名 の対応を返す。"""
         raise NotImplementedError

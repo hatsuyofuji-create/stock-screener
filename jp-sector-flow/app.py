@@ -56,11 +56,20 @@ col1, col2 = st.columns([1, 2])
 
 with col1:
     st.subheader("今日のランキング（売買代金）")
+
+    def _dir(pm):
+        if pm is None or pd.isna(pm):
+            return "— 不明"
+        return f"🟢買い優勢 +{pm:.1f}%" if pm >= 0 else f"🔴売り優勢 {pm:.1f}%"
+
     show = ranking.copy()
-    show["momentum"] = show["momentum"].map(lambda v: f"{v:+.2f}%")
+    if "price_mom" in show.columns:
+        show["price_mom"] = show["price_mom"].map(_dir)
+    else:
+        show["price_mom"] = "—"
     show["turnover"] = show["turnover"].map(lambda v: f"{v:,.1f}")
-    show = show.rename(
-        columns={"rank": "順位", "sector": "業種", "turnover": "売買代金(億円)", "momentum": "勢い(5日)"}
+    show = show[["rank", "sector", "turnover", "price_mom"]].rename(
+        columns={"rank": "順位", "sector": "業種", "turnover": "売買代金(億円)", "price_mom": "価格の方向(5日)"}
     )
     st.dataframe(show, hide_index=True, use_container_width=True)
 

@@ -33,12 +33,17 @@ def main() -> int:
     if meta_path.exists():
         asof = json.loads(meta_path.read_text(encoding="utf-8")).get("asof", "")
 
-    lines = [f"📊 セクター売買代金 {asof}（テスト送信）", "上位業種（売買代金）:"]
+    def direction(pm) -> str:
+        if pm is None or pd.isna(pm):
+            return "— 方向不明"
+        return f"🟢買い優勢 +{pm:.1f}%" if pm >= 0 else f"🔴売り優勢 {pm:.1f}%"
+
+    lines = [f"📊 セクター資金フロー {asof}（テスト送信）", "売買代金 上位業種（＋価格の方向）:"]
     for _, r in rank.head(TOP_N).iterrows():
-        arrow = "↑" if r["momentum"] >= 0 else "↓"
+        pm = r["price_mom"] if "price_mom" in r else None
         lines.append(
-            f"{int(r['rank'])}. {r['sector']} "
-            f"（{r['turnover']:,.0f}億円 / 勢い {r['momentum']:+.1f}% {arrow}）"
+            f"{int(r['rank'])}. {r['sector']}　{r['turnover']:,.0f}億円\n"
+            f"　　{direction(pm)}"
         )
     message = "\n".join(lines)
 
