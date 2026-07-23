@@ -34,21 +34,23 @@ def main() -> int:
     if meta_path.exists():
         asof = json.loads(meta_path.read_text(encoding="utf-8")).get("asof", "")
 
-    def direction(pm) -> str:
-        if pm is None or pd.isna(pm):
-            return "— 方向不明"
-        return f"🟢買い優勢 +{pm:.1f}%" if pm >= 0 else f"🔴売り優勢 {pm:.1f}%"
+    def pm(v) -> str:
+        if v is None or pd.isna(v):
+            return "—"
+        return f"🟢+{v:.1f}%" if v >= 0 else f"🔴{v:.1f}%"
+
+    def col(r, name):
+        return r[name] if name in r else None
 
     page_url = os.getenv("PAGE_URL") or "https://hatsuyofuji-create.github.io/stock-screener/sector-flow/"
-    lines = [f"📊 セクター資金フロー {asof}（テスト送信）", "売買代金 上位業種（＋価格の方向）:"]
+    lines = [f"📊 セクター資金フロー {asof}（テスト送信）", "売買代金 上位業種（価格の方向 15/30/150日）:"]
     for _, r in rank.head(TOP_N).iterrows():
-        pm = r["price_mom"] if "price_mom" in r else None
         lines.append(
             f"{int(r['rank'])}. {r['sector']}　{r['turnover']:,.0f}億円\n"
-            f"　　{direction(pm)}"
+            f"　　15日{pm(col(r,'price_mom_15'))} / 30日{pm(col(r,'price_mom_30'))} / 150日{pm(col(r,'price_mom_150'))}"
         )
     lines.append("")
-    lines.append("📈 グラフ・全業種ランキング:")
+    lines.append("📈 全業種ランキング:")
     lines.append(page_url)
     message = "\n".join(lines)
 

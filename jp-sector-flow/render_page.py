@@ -21,38 +21,16 @@ DB = ROOT / "db"
 TEMPLATE = ROOT / "page_template.html"
 OUT = ROOT.parent / "docs" / "sector-flow" / "index.html"
 
-# 8色の CVD 対応カテゴリカルパレット（テンプレート側と対応）
-PAL = [
-    {"light": "#2a78d6", "dark": "#3987e5"},
-    {"light": "#eb6834", "dark": "#d95926"},
-    {"light": "#1baf7a", "dark": "#199e70"},
-    {"light": "#eda100", "dark": "#c98500"},
-    {"light": "#e87ba4", "dark": "#d55181"},
-    {"light": "#008300", "dark": "#008300"},
-    {"light": "#4a3aa7", "dark": "#9085e9"},
-    {"light": "#e34948", "dark": "#e66767"},
-]
-
 
 def build_payload() -> dict:
-    flow = pd.read_csv(DB / "turnover.csv", index_col=0)
     ranking = pd.read_csv(DB / "ranking.csv")
-    monthly = pd.read_csv(DB / "monthly.csv")
-    return {
-        "dates": [str(d) for d in flow.index],
-        "series": {c: [round(float(x), 1) for x in flow[c]] for c in flow.columns},
-        "ranking": ranking.to_dict(orient="records"),
-        "monthly": [
-            {
-                "month": str(m["month"]),
-                "tri": float(m["tri"]),
-                "days": int(m["days"]),
-                "partial": bool(m["partial"]),
-            }
-            for _, m in monthly.iterrows()
-        ],
-        "pal": PAL,
-    }
+    asof = ""
+    meta_path = DB / "meta.json"
+    if meta_path.exists():
+        asof = json.loads(meta_path.read_text(encoding="utf-8")).get("asof", "")
+    # NaN を None（JSONのnull）にして渡す
+    records = ranking.where(pd.notnull(ranking), None).to_dict(orient="records")
+    return {"ranking": records, "asof": asof}
 
 
 def main() -> int:

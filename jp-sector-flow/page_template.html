@@ -3,30 +3,24 @@
   :root{
     color-scheme: light;
     --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
-    --up:#006300; --down:#d03b3b; --accent:#256abf; --chip:#f1f0ec;
-    --rowon:rgba(37,106,191,.06); --rowhover:rgba(11,11,11,.035); --faint:#898781;
+    --border:rgba(11,11,11,.10); --up:#006300; --down:#d03b3b; --accent:#256abf; --rowhover:rgba(11,11,11,.035);
   }
   @media (prefers-color-scheme: dark){
     :root:where(:not([data-theme="light"])){
       color-scheme: dark;
       --page:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
-      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
-      --up:#0ca30c; --down:#e66767; --accent:#5598e7; --chip:#232321;
-      --rowon:rgba(57,135,229,.12); --rowhover:rgba(255,255,255,.05); --faint:#8b8a84;
+      --border:rgba(255,255,255,.10); --up:#0ca30c; --down:#e66767; --accent:#5598e7; --rowhover:rgba(255,255,255,.05);
     }
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
     --page:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
-    --up:#0ca30c; --down:#e66767; --accent:#5598e7; --chip:#232321;
-    --rowon:rgba(57,135,229,.12); --rowhover:rgba(255,255,255,.05); --faint:#8b8a84;
+    --border:rgba(255,255,255,.10); --up:#0ca30c; --down:#e66767; --accent:#5598e7; --rowhover:rgba(255,255,255,.05);
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--page);color:var(--ink);
     font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;}
-  .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 64px;}
+  .wrap{max-width:960px;margin:0 auto;padding:28px 20px 64px;}
   .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
   h1{font-size:clamp(24px,4vw,34px);margin:.15em 0 .1em;letter-spacing:-.01em;text-wrap:balance;}
   .lede{color:var(--ink2);max-width:66ch;margin:.2em 0 0;}
@@ -39,278 +33,92 @@
   .card h2{font-size:15px;margin:0 0 2px;letter-spacing:.01em;}
   .card .sub{font-size:12.5px;color:var(--muted);margin:0 0 16px;}
   .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
-  @media (max-width:560px){.tiles{grid-template-columns:1fr;}}
+  @media (max-width:620px){.tiles{grid-template-columns:1fr;}}
   .tile{border:1px solid var(--border);border-radius:12px;padding:14px 15px;background:var(--page);}
   .tile .rk{font-size:11px;letter-spacing:.1em;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .tile .nm{font-size:16px;font-weight:650;margin:6px 0 10px;line-height:1.3;min-height:2.6em;}
+  .tile .nm{font-size:16px;font-weight:650;margin:6px 0 8px;line-height:1.3;min-height:2.6em;}
   .tile .big{font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
   .tile .big .u{font-size:13px;font-weight:600;color:var(--muted);margin-left:3px;}
-  .tile .row{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);margin-top:8px;}
-  .tile .mom{font-weight:700;font-variant-numeric:tabular-nums;}
+  .dirs{margin-top:11px;border-top:1px solid var(--border);padding-top:9px;display:flex;flex-direction:column;gap:5px;}
+  .dline{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;}
+  .dline>span:first-child{color:var(--muted);}
+  .dline>span:last-child{font-weight:700;font-variant-numeric:tabular-nums;}
   .up{color:var(--up);} .down{color:var(--down);}
-  .months{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
-  .mo{flex:0 0 auto;min-width:84px;border:1px solid var(--border);border-radius:10px;padding:9px 11px;background:var(--page);}
-  .mo.latest{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent);}
-  .mo .ml{font-size:11px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums;}
-  .mo .mv{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:3px;letter-spacing:-.01em;}
-  .mo .mv .u{font-size:11px;color:var(--muted);font-weight:600;margin-left:2px;}
-  .mo .mp{font-size:10px;color:var(--muted);margin-top:2px;}
-  .legend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;}
-  .legend .hint{font-size:12px;color:var(--muted);}
-  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:550;padding:5px 10px;border-radius:999px;
-    border:1px solid var(--border);background:var(--chip);color:var(--ink2);cursor:pointer;}
-  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-  .chip .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto;}
-  .chip .x{color:var(--muted);font-weight:700;margin-left:1px;}
-  .chartbox{position:relative;width:100%;}
-  svg{display:block;width:100%;height:auto;overflow:visible;touch-action:none;}
-  /* ホバー時の読み取りバー：グラフの外（上）に出すので線と重ならない */
-  .readout{display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;min-height:24px;
-    margin:0 0 10px;padding:7px 11px;font-size:13px;color:var(--ink2);
-    background:var(--page);border:1px solid var(--border);border-radius:10px;}
-  .readout .hint{color:var(--muted);font-size:12px;}
-  .readout .ro-date{color:var(--muted);font-variant-numeric:tabular-nums;}
-  .readout .ro-sec{display:inline-flex;align-items:center;gap:7px;font-weight:650;color:var(--ink);}
-  .readout .ro-sec .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto;}
-  .readout .ro-val{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);}
-  .readout .ro-val .u{font-size:11px;color:var(--muted);font-weight:600;margin-left:2px;}
-  .readout .ro-rank{color:var(--ink2);font-variant-numeric:tabular-nums;}
-  .readout .ro-mom{font-weight:700;font-variant-numeric:tabular-nums;}
   .tablewrap{overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:480px;}
-  th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;white-space:nowrap;}
-  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px;}
+  th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  th{font-size:11px;letter-spacing:.05em;color:var(--muted);font-weight:650;}
   th:nth-child(2),td:nth-child(2){text-align:left;}
   td:nth-child(1){color:var(--muted);width:1%;}
-  tbody tr{cursor:pointer;}
+  td:nth-child(4),td:nth-child(5),td:nth-child(6){font-weight:700;}
   tbody tr:hover{background:var(--rowhover);}
-  tbody tr.on{background:var(--rowon);}
-  td .snm{display:inline-flex;align-items:center;gap:9px;}
-  .dot{width:11px;height:11px;border-radius:3px;flex:0 0 auto;border:1px solid var(--axis);background:transparent;}
-  .dot.filled{border-color:transparent;}
-  .pill{display:inline-flex;align-items:center;gap:4px;font-weight:700;}
   .foot{margin-top:26px;font-size:12.5px;color:var(--muted);max-width:72ch;}
   .foot p{margin:.5em 0;}
-  a{color:var(--accent);}
+  code{font-size:.92em;}
 </style>
 
 <div class="wrap">
-  <div class="eyebrow">日本株 · セクター資金フロー · 売買代金 · 東証33業種</div>
-  <h1>どの業種にお金が動いているか</h1>
-  <p class="lede">東証<b>33業種</b>それぞれの<b>売買代金</b>（実際に売買された金額・億円）＝どれだけ活発かを表します。ただし売買代金は買い・売りの合計なので、<b>価格の方向（🟢買い優勢／🔴売り優勢）</b>を併記します。<b>活発（売買代金 大）×買い優勢</b>＝本当に資金が入っている、と読めます。毎営業日この画面が更新され、上位はLINEにも届きます。</p>
+  <div class="eyebrow">日本株 · セクター資金フロー · 東証33業種</div>
+  <h1>どの業種が買われているか</h1>
+  <p class="lede"><b>売買代金</b>（実際に売買された金額・億円）＝その業種がどれだけ活発かを表します。ただし買い・売りの合計なので、<b>買われているか売られているか</b>は株価の方向で判断します。ここでは<b>15日・30日・150日</b>の株価変化を🟢買い優勢／🔴売り優勢で示します。<b>活発（売買代金 大）×買い優勢</b>＝本当に資金が入っている、と読めます。毎営業日 自動更新し、上位はLINEにも届きます。</p>
   <div class="meta">
     <span class="badge">● 実データ（J-Quants V2）</span>
     <span>基準日 <b id="m-asof"></b></span>
-    <span>期間 <b id="m-range"></b></span>
-    <span>指標 <b>売買代金（億円・5日移動平均）</b></span>
+    <span>指標 <b>売買代金（億円）＋価格の方向（15/30/150日）</b></span>
   </div>
 
   <section class="card">
     <h2>今日の資金フロー 上位3業種（売買代金）</h2>
-    <p class="sub">売買代金（億円）が大きい順。価格の方向＝直近5営業日の株価変化（🟢買い優勢／🔴売り優勢）</p>
+    <p class="sub">売買代金（億円）が大きい順。価格の方向＝各期間の株価変化（🟢買い優勢／🔴売り優勢）</p>
     <div class="tiles" id="tiles"></div>
   </section>
 
   <section class="card">
-    <h2>全業種合計 売買代金（月次・兆円）</h2>
-    <p class="sub">33業種＋その他の売買代金の月間合計。※最新月は途中まで（営業日数を併記）</p>
-    <div class="months" id="months"></div>
-  </section>
-
-  <section class="card">
-    <h2>業種別 売買代金（億円）の推移 — 全34業種・約1年</h2>
-    <p class="sub"><b>線にカーソルを合わせると、その線だけ色がついて業種名が出ます</b>（他はグレー）。通常は売買代金 上位5業種を色つき表示（表の行クリックで固定を切替・最大8）。</p>
-    <div class="legend" id="legend"></div>
-    <div class="readout" id="readout"></div>
-    <div class="chartbox">
-      <svg id="chart" role="img" aria-label="全34業種 売買代金の1年推移"></svg>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>全34業種 ランキング（売買代金）</h2>
-    <p class="sub">売買代金（億円）の大きい順。右列は<b>価格の方向</b>（🟢買い優勢／🔴売り優勢＝直近5営業日の株価変化）。行をクリックでグラフの色つき表示を切替。</p>
+    <h2>全業種 ランキング（売買代金）＋価格の方向</h2>
+    <p class="sub">売買代金（億円）の大きい順。15日／30日／150日は株価の変化率（🟢買い優勢＝プラス／🔴売り優勢＝マイナス）。</p>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>#</th><th>業種</th><th>売買代金（億円）</th><th>価格の方向（5日）</th></tr></thead>
+        <thead><tr><th>#</th><th>業種</th><th>売買代金（億円）</th><th>15日</th><th>30日</th><th>150日</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
   </section>
 
   <div class="foot">
-    <p><b>J-Quants の実データです。</b> 東証33業種＋分類外「その他」の売買代金（V2の <code>Va</code>）＝活発さと、株価（<code>AdjC</code>）から求めた<b>価格の方向（🟢買い優勢／🔴売り優勢＝直近5営業日の株価変化）</b>を、毎営業日 GitHub Actions が自動更新して倉庫に保存します。売買代金は5営業日移動平均で表示。<b>電気機器は売買代金が突出して大きい</b>ため初期グラフからは外しています（表の行クリックで追加）。縦目盛りは色つき表示中の業種に合わせて自動調整します。</p>
-    <p>※ 売買代金は買い・売りの合計なので「活発さ」の指標です。買われているか売られているかは「価格の方向」で判断します（活発×買い優勢＝資金流入と読めます）。</p>
-    <p>投資判断・売買の推奨を行うものではありません（表示専用）。</p>
+    <p><b>J-Quants の実データです。</b> 東証33業種＋分類外「その他」の売買代金（V2の <code>Va</code>）と、株価（<code>AdjC</code>）から求めた各業種の株価指数の 15/30/150日 変化を、毎営業日 GitHub Actions が自動更新して倉庫に保存・公開します。</p>
+    <p>※ 売買代金は買い・売りの合計なので「活発さ」の指標です。買われているか売られているかは「価格の方向」で判断します（活発×買い優勢＝資金流入と読めます）。投資判断・売買の推奨を行うものではありません（表示専用）。</p>
   </div>
 </div>
 
 <script>
 const D = __BLOB__;
 const $ = s => document.querySelector(s);
-const MAX = 8;
-const SECTORS = D.ranking.map(r => r.sector);
-const rankOf = {}; D.ranking.forEach(r => rankOf[r.sector] = r);
 const fmt = v => Math.round(v).toLocaleString('ja-JP');
-const isDark = () => {
-  const t = document.documentElement.getAttribute('data-theme');
-  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-};
-const slotColor = i => isDark() ? D.pal[i].dark : D.pal[i].light;
+const hasV = v => v!==null && v!==undefined && !isNaN(v);
+const pmText = v => !hasV(v) ? '—' : (v>=0 ? `🟢 +${(+v).toFixed(1)}%` : `🔴 ${(+v).toFixed(1)}%`);
+const pmCls  = v => !hasV(v) ? '' : (v>=0 ? 'up' : 'down');
 
-const slot = new Map();
-// 既定表示: 売買代金上位。ただし分類外「その他」と、突出した外れ値(#1が#2の3倍超)は初期表示から除く
-let _cand = D.ranking.filter(r => r.sector !== "その他");
-if (_cand.length > 1 && _cand[0].turnover > 3 * _cand[1].turnover) _cand = _cand.slice(1);
-_cand.slice(0,5).forEach((r,i)=> slot.set(r.sector, i));
+$('#m-asof').textContent = D.asof || '-';
 
-$('#m-asof').textContent = D.dates[D.dates.length-1];
-$('#m-range').textContent = D.dates[0] + ' 〜 ' + D.dates[D.dates.length-1];
-
-// 価格の方向（買い/売り優勢）の表示
-const hasPM = pm => pm!==null && pm!==undefined && !isNaN(pm);
-const dirText = pm => !hasPM(pm) ? '— 不明' : (pm>=0 ? `🟢買い優勢 +${(+pm).toFixed(1)}%` : `🔴売り優勢 ${(+pm).toFixed(1)}%`);
-const dirCls = pm => !hasPM(pm) ? '' : (pm>=0 ? 'up' : 'down');
-
-$('#tiles').innerHTML = D.ranking.slice(0,3).map(r=>{
-  return `<div class="tile"><div class="rk">第${r.rank}位</div><div class="nm">${r.sector}</div>
+$('#tiles').innerHTML = D.ranking.slice(0,3).map(r=>`
+  <div class="tile">
+    <div class="rk">第${r.rank}位</div>
+    <div class="nm">${r.sector}</div>
     <div class="big">${fmt(r.turnover)}<span class="u">億円</span></div>
-    <div class="row"><span>価格の方向</span><span class="mom ${dirCls(r.price_mom)}">${dirText(r.price_mom)}</span></div></div>`;
-}).join('');
+    <div class="dirs">
+      <div class="dline"><span>15日</span><span class="${pmCls(r.price_mom_15)}">${pmText(r.price_mom_15)}</span></div>
+      <div class="dline"><span>30日</span><span class="${pmCls(r.price_mom_30)}">${pmText(r.price_mom_30)}</span></div>
+      <div class="dline"><span>150日</span><span class="${pmCls(r.price_mom_150)}">${pmText(r.price_mom_150)}</span></div>
+    </div>
+  </div>`).join('');
 
-function firstFreeSlot(){ const u=new Set(slot.values()); for(let i=0;i<MAX;i++) if(!u.has(i)) return i; return -1; }
-let flashT;
-function flash(){ const h=$('#legend .hint'); if(!h) return; const o=h.textContent;
-  h.textContent='色つき固定は最大8業種までです。ひとつ外してください。'; h.style.color='var(--down)';
-  clearTimeout(flashT); flashT=setTimeout(()=>{h.textContent=o;h.style.color='';},2600); }
-function toggle(sector){
-  if(slot.has(sector)) slot.delete(sector);
-  else { const f=firstFreeSlot(); if(f<0){flash();return;} slot.set(sector,f); }
-  renderAll();
-}
-
-function renderTable(){
-  $('#tbody').innerHTML = D.ranking.map(r=>{
-    const on=slot.has(r.sector);
-    const dot = on ? `<span class="dot filled" style="background:${slotColor(slot.get(r.sector))}"></span>` : `<span class="dot"></span>`;
-    return `<tr class="${on?'on':''}" data-s="${r.sector.replace(/"/g,'&quot;')}">
-      <td>${r.rank}</td><td><span class="snm">${dot}${r.sector}</span></td>
-      <td>${fmt(r.turnover)}</td>
-      <td class="${dirCls(r.price_mom)}"><span class="pill">${dirText(r.price_mom)}</span></td></tr>`;
-  }).join('');
-  $('#tbody').querySelectorAll('tr').forEach(tr=> tr.addEventListener('click',()=>toggle(tr.dataset.s)));
-}
-function renderLegend(){
-  const active=[...slot.entries()].sort((a,b)=>a[1]-b[1]);
-  const chips=active.map(([s,i])=>`<button class="chip" data-s="${s.replace(/"/g,'&quot;')}"><span class="sw" style="background:${slotColor(i)}"></span>${s}<span class="x">×</span></button>`).join('');
-  $('#legend').innerHTML = chips + `<span class="hint">色つき ${active.length}/8 · 他の線はカーソルで業種名を表示</span>`;
-  $('#legend').querySelectorAll('.chip').forEach(b=> b.addEventListener('click',()=>toggle(b.dataset.s)));
-}
-
-// monthly totals (all sectors), 兆円
-function renderMonths(){
-  const mo=(D.monthly||[]).slice(-8);
-  $('#months').innerHTML = mo.map((m,idx)=>{
-    const latest = idx===mo.length-1;
-    const ym = m.month.slice(2).replace('-','/');
-    const val = m.tri.toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1});
-    return `<div class="mo ${latest?'latest':''}">
-      <div class="ml">${ym}</div>
-      <div class="mv">${val}<span class="u">兆円</span></div>
-      <div class="mp">${m.partial?'途中 '+m.days+'日':m.days+'日'}</div>
-    </div>`;
-  }).join('');
-}
-
-const svg=$('#chart'), readout=$('#readout');
-const PAD={t:14,r:16,b:26,l:52};
-let geom=null;
-const RO_HINT = `<span class="hint">グラフの線にカーソルを合わせると、ここに 日付・業種名・売買代金・順位・勢い が表示されます</span>`;
-function resetReadout(){ readout.innerHTML = RO_HINT; }
-
-function buildGeom(){
-  const box=svg.parentElement.getBoundingClientRect();
-  const W=Math.max(320,box.width), H=Math.min(760,Math.max(480,W*0.82));
-  const N=D.dates.length;
-  // 目盛りは「色つき表示中の業種」に合わせる（電気機器など突出値がある実データでも見やすく）
-  const scaleSet = slot.size ? [...slot.keys()] : SECTORS;
-  let lo=Infinity,hi=-Infinity;
-  scaleSet.forEach(s=>D.series[s].forEach(v=>{if(v<lo)lo=v;if(v>hi)hi=v;}));
-  if(!isFinite(lo)){lo=0;hi=1;}
-  const padv=(hi-lo)*0.08||1; lo=Math.max(0,lo-padv); hi=hi+padv;
-  const X=i=>PAD.l+(i/(N-1))*(W-PAD.l-PAD.r);
-  const Y=v=>PAD.t+(1-(v-lo)/(hi-lo))*(H-PAD.t-PAD.b);
-  const paths={};
-  SECTORS.forEach(s=>{ paths[s]=D.series[s].map((v,k)=>`${X(k).toFixed(1)},${Y(v).toFixed(1)}`).join(' '); });
-  let chrome=`<defs><clipPath id="plot"><rect x="${PAD.l}" y="${PAD.t}" width="${(W-PAD.l-PAD.r).toFixed(1)}" height="${(H-PAD.t-PAD.b).toFixed(1)}"/></clipPath></defs>`;
-  const ticks=4;
-  for(let k=0;k<=ticks;k++){ const v=lo+(hi-lo)*k/ticks,y=Y(v);
-    chrome+=`<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${W-PAD.r}" y2="${y.toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>`;
-    chrome+=`<text x="${PAD.l-8}" y="${(y+3.5).toFixed(1)}" text-anchor="end" fill="var(--muted)" font-size="10.5" style="font-variant-numeric:tabular-nums">${fmt(v)}</text>`; }
-  chrome+=`<text x="4" y="${(PAD.t-3).toFixed(1)}" text-anchor="start" fill="var(--muted)" font-size="10">億円</text>`;
-  const step=Math.max(1,Math.floor(N/5));
-  for(let i=0;i<N;i+=step) chrome+=`<text x="${X(i).toFixed(1)}" y="${H-8}" text-anchor="middle" fill="var(--muted)" font-size="10">${D.dates[i].slice(0,7)}</text>`;
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
-  geom={W,H,N,X,Y,lo,hi,paths,chrome};
-}
-
-const greyLine = s => `<polyline points="${geom.paths[s]}" fill="none" stroke="var(--faint)" stroke-opacity="0.3" stroke-width="1"/>`;
-const colorLine = (s,col,w) => `<polyline points="${geom.paths[s]}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
-
-// focus=null: default（上位5色つき＋他グレー） / focus=業種名: その線だけ色・他は全部グレー
-function render(focus, ix){
-  if(!geom) return;
-  let lines='';
-  if(focus){
-    SECTORS.forEach(s=>{ if(s!==focus) lines+=greyLine(s); });
-    const col = slot.has(focus) ? slotColor(slot.get(focus)) : 'var(--accent)';
-    lines+=colorLine(focus,col,2.75);
-    if(ix!=null){ const v=D.series[focus][ix], cx=geom.X(ix);
-      lines+=`<line x1="${cx.toFixed(1)}" y1="${PAD.t}" x2="${cx.toFixed(1)}" y2="${(geom.H-PAD.b).toFixed(1)}" stroke="var(--axis)" stroke-width="1"/>`;
-      lines+=`<circle cx="${cx.toFixed(1)}" cy="${geom.Y(v).toFixed(1)}" r="4.2" fill="${col}" stroke="var(--surface)" stroke-width="1.75"/>`;
-    }
-  } else {
-    SECTORS.filter(s=>!slot.has(s)).forEach(s=> lines+=greyLine(s));
-    [...slot.entries()].sort((a,b)=>a[1]-b[1]).forEach(([s,i])=>{ const col=slotColor(i);
-      lines+=colorLine(s,col,2);
-      const li=geom.N-1,lv=D.series[s][li];
-      lines+=`<circle cx="${geom.X(li).toFixed(1)}" cy="${geom.Y(lv).toFixed(1)}" r="3.2" fill="${col}" stroke="var(--surface)" stroke-width="1.5"/>`;
-    });
-  }
-  // データ線は描画領域にクリップ（突出値の線がはみ出しても軸を壊さない）
-  svg.innerHTML = geom.chrome + `<g clip-path="url(#plot)">${lines}</g>`;
-}
-function draw(){ buildGeom(); render(null); }
-
-let raf=0, lastEvt=null;
-function onMove(e){ lastEvt=e; if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; doMove(lastEvt); }); }
-function doMove(e){
-  if(!geom)return;
-  const {W,H,N,X,Y,lo,hi}=geom;
-  const r=svg.getBoundingClientRect();
-  const px=(e.clientX-r.left)*(W/r.width);
-  const py=(e.clientY-r.top)*(H/r.height);
-  let i=Math.round((px-PAD.l)/(W-PAD.l-PAD.r)*(N-1)); i=Math.max(0,Math.min(N-1,i));
-  const cursVal=lo+(1-(py-PAD.t)/(H-PAD.t-PAD.b))*(hi-lo);
-  let best=null,bd=Infinity;
-  SECTORS.forEach(s=>{ const d=Math.abs(D.series[s][i]-cursVal); if(d<bd){bd=d;best=s;} });
-  render(best, i);
-  const rk=rankOf[best], val=D.series[best][i];
-  const col = slot.has(best) ? slotColor(slot.get(best)) : 'var(--accent)';
-  readout.innerHTML =
-    `<span class="ro-date">${D.dates[i]}</span>`+
-    `<span class="ro-sec"><span class="sw" style="background:${col}"></span>${best}</span>`+
-    `<span class="ro-val">${fmt(val)}<span class="u">億円</span></span>`+
-    `<span class="ro-rank">売買代金 第${rk.rank}位</span>`+
-    `<span class="ro-mom ${dirCls(rk.price_mom)}">${dirText(rk.price_mom)}</span>`;
-}
-svg.addEventListener('mousemove',onMove);
-svg.addEventListener('mouseleave',()=>{ if(raf){cancelAnimationFrame(raf);raf=0;} render(null); resetReadout(); });
-
-function renderAll(){ renderLegend(); renderTable(); draw(); }
-renderMonths(); renderAll(); resetReadout();
-let rt; addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(draw,120);});
-const mq=matchMedia('(prefers-color-scheme: dark)');
-mq.addEventListener&&mq.addEventListener('change',renderAll);
-new MutationObserver(renderAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+$('#tbody').innerHTML = D.ranking.map(r=>`
+  <tr>
+    <td>${r.rank}</td>
+    <td>${r.sector}</td>
+    <td>${fmt(r.turnover)}</td>
+    <td class="${pmCls(r.price_mom_15)}">${pmText(r.price_mom_15)}</td>
+    <td class="${pmCls(r.price_mom_30)}">${pmText(r.price_mom_30)}</td>
+    <td class="${pmCls(r.price_mom_150)}">${pmText(r.price_mom_150)}</td>
+  </tr>`).join('');
 </script>
