@@ -48,24 +48,22 @@ def is_weekday(d: date | None = None) -> bool:
     return d.weekday() < 5
 
 
-def _direction(price_mom) -> str:
-    """価格の勢いから買い/売り優勢の表示を作る。"""
-    if price_mom is None or pd.isna(price_mom):
-        return "— 方向不明"
-    if price_mom >= 0:
-        return f"🟢買い優勢 +{price_mom:.1f}%"
-    return f"🔴売り優勢 {price_mom:.1f}%"
+def _pm(v) -> str:
+    """価格の方向1期間ぶんを 🟢+x.x% / 🔴x.x% / — で表す。"""
+    if v is None or pd.isna(v):
+        return "—"
+    return f"🟢+{v:.1f}%" if v >= 0 else f"🔴{v:.1f}%"
 
 
 def _build_message(ranking, asof) -> str:
-    lines = [f"📊 セクター資金フロー {asof.strftime('%Y-%m-%d')}", "売買代金 上位業種（＋価格の方向）:"]
+    lines = [f"📊 セクター資金フロー {asof.strftime('%Y-%m-%d')}", "売買代金 上位業種（価格の方向 15/30/150日）:"]
     for _, row in ranking.head(TOP_N).iterrows():
         lines.append(
             f"{int(row['rank'])}. {row['sector']}　{row['turnover']:,.0f}億円\n"
-            f"　　{_direction(row.get('price_mom'))}"
+            f"　　15日{_pm(row.get('price_mom_15'))} / 30日{_pm(row.get('price_mom_30'))} / 150日{_pm(row.get('price_mom_150'))}"
         )
     lines.append("")
-    lines.append("📈 グラフ・全業種ランキング:")
+    lines.append("📈 全業種ランキング:")
     lines.append(PAGE_URL)
     return "\n".join(lines)
 
