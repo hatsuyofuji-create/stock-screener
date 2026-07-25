@@ -1,0 +1,36 @@
+# TradingView スクリーナー（7条件）→ LINE 通知の日次自動実行。
+#
+# Windows のタスクスケジューラで毎日実行する代わりに、GitHub 上で毎営業日
+# 自動実行して LINE に通知する。PC を起動しておく必要はなく、日本語パスや
+# ¥/全角/py ランチャー解決の問題も起きない。
+#
+# 事前に GitHub リポジトリの Settings → Secrets and variables → Actions で
+# 次のシークレットを登録（このリポジトリでは登録済み）:
+#   - LINE_CHANNEL_ACCESS_TOKEN
+#   - LINE_USER_ID
+name: tv-screener-daily
+
+on:
+  schedule:
+    # 平日 06:50 UTC = 15:50 JST（大引け後・確定値を取る想定）
+    - cron: "50 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install tradingview-screener requests pandas
+      - name: Run TradingView screener
+        run: python tv_screener.py
