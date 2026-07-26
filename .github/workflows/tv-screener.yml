@@ -4,10 +4,15 @@
 # 自動実行して LINE に通知する。PC を起動しておく必要はなく、日本語パスや
 # ¥/全角/py ランチャー解決の問題も起きない。
 #
+# 通知先は LINE 公式アカウント「ラッキーさんアイデア」。
+# セクター資金フロー（LINE_CHANNEL_ACCESS_TOKEN / LINE_USER_ID）とは別チャネルなので、
+# 混ざらないよう専用シークレットを使う。
 # 事前に GitHub リポジトリの Settings → Secrets and variables → Actions で
-# 次のシークレットを登録（このリポジトリでは登録済み）:
-#   - LINE_CHANNEL_ACCESS_TOKEN
-#   - LINE_USER_ID
+# 次のシークレットを登録:
+#   - LINE_LUCKY_CHANNEL_ACCESS_TOKEN … 「ラッキーさんアイデア」チャネルのアクセストークン
+#   - LINE_LUCKY_USER_ID              … 同チャネルでの自分のユーザーID（Uxxxx…）
+# ※どちらの値も、手動運用していた tv_line_notify.py に直書きしていたものと同じ。
+#   LINEのユーザーIDはチャネルごとに異なる点に注意（セクター資金フローのIDは使えない）。
 name: tv-screener-daily
 
 on:
@@ -23,8 +28,9 @@ jobs:
   run:
     runs-on: ubuntu-latest
     env:
-      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+      # 「ラッキーさんアイデア」チャネル専用のシークレットを使う（セクター資金フローとは別）。
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_LUCKY_CHANNEL_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_LUCKY_USER_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
