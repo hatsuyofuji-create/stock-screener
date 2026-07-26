@@ -1,0 +1,61 @@
+# 新セグメント出現モニターの日次自動実行。
+#
+# 有価証券報告書（EDINET）の事業セグメントを見て、前期になかったセグメントが
+# 増えた銘柄を検知し、LINE 通知する。検知の材料になる履歴（db/segments.csv）は
+# リポジトリにコミットして貯める。
+#
+# 事前に GitHub リポジトリの Settings → Secrets and variables → Actions で登録:
+#   EDINET（必須）:
+#     - EDINET_API_KEY … 金融庁 EDINET「アカウント管理」で発行した購読キー
+#   LINE（任意・未設定ならログ出力にフォールバック）:
+#     - LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID
+#       （通知先を分けたい場合は、下の env でチャネル別シークレットに差し替え可）
+#
+# 初期の履歴づくり（バックフィル）は workflow_dispatch から SEGMENT_SINCE を渡して
+# 手動実行するとよい（例: 2025-06-01）。有報が集中する時期に前期＋今期がそろう。
+name: segment-watch-daily
+
+on:
+  schedule:
+    # 平日 12:00 UTC = 21:00 JST（当日提出ぶんが出そろった頃）
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "バックフィル開始日 YYYY-MM-DD（空なら直近ウィンドウのみ）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jp-segment-watch
+    env:
+      PROVIDER: edinet
+      EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+      # workflow_dispatch で since を渡したときだけバックフィル走査になる
+      SEGMENT_SINCE: ${{ github.event.inputs.since }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run segment watch
+        run: python update_segments.py
+      - name: Save results
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          # new_segments.csv は検知が出た回だけ生成されるので、db 配下をまとめて追加
+          git add -A db
+          git commit -m "update segment-watch results" || echo "no changes"
+          git push
