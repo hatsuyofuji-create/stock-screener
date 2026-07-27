@@ -18,6 +18,7 @@ from . import models, schemas
 from .services import to_raw, sorted_statements, latest_and_prior
 from .engines.financials import compute_metrics, compute_changes
 from .engines.fscore import compute_fscore
+from .routers import valuation as valuation_router
 
 DISCLAIMER = (
     "本アプリは投資助言ツールではありません。投資判断は利用者自身の責任で行ってください。"
@@ -38,6 +39,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(valuation_router.router)
 
 
 @app.get("/")

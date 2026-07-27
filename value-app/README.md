@@ -10,7 +10,7 @@
 
 - [x] **Phase 0** — 雛形・データモデル（第3章）
 - [x] **Phase 1** — 財務指標エンジン（4.1）＋ Fスコアエンジン（4.2）＝**心臓部**
-- [ ] Phase 2 — 適正株価・安全域 ＋ Park24型シナリオ計算（4.3）
+- [x] **Phase 2** — 適正株価・安全域 ＋ Park24型シナリオ計算（4.3）
 - [ ] Phase 3 — 予想Excelアップロード＆マッピング（4.6）
 - [ ] Phase 4 — スクリーニング＋銘柄マトリクス（4.5 / 4.7）
 - [ ] Phase 5 — データ自動取得（EDINET/TDnet, 4.9）
@@ -29,6 +29,9 @@ value-app/
       engines/
         financials.py  4.1 財務指標計算エンジン
         fscore.py      4.2 Fスコア計算エンジン
+        valuation.py   4.3 適正株価・安全域＋Park24型シナリオ
+      routers/
+        valuation.py   適正株価・シナリオ API
       main.py          FastAPI エントリポイント
     tests/             pytest（計算の正しさを担保）
     seed.py            サンプル銘柄1社を投入
@@ -78,6 +81,8 @@ uvicorn app.main:app --reload  # http://127.0.0.1:8000/docs で API を確認
 | POST | `/api/companies/{code}/statements/import_csv` | 財務データを CSV 一括取込 |
 | GET | `/api/companies/{code}/metrics` | 全期の財務指標＋前年比（4.1） |
 | GET | `/api/companies/{code}/fscore` | Fスコア 実績版（4.2） |
+| POST | `/api/valuation` | 適正株価・安全域・リスクリワード（4.3, ステートレス） |
+| POST | `/api/companies/{code}/valuation` | 上記＋Forecast保存（4.3） |
 
 ## 設計メモ
 

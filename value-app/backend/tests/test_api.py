@@ -87,3 +87,42 @@ def test_cyclical_flag(client):
     })
     r = client.get("/api/companies/7777")
     assert r.json()["is_cyclical"] is True
+
+
+def test_valuation_endpoint(client):
+    """Phase 2: 適正株価・安全域・リスクリワードの一括計算。"""
+    payload = {
+        "current_price": 10,
+        "multiples": {"fair_per": 15, "fair_pbr": 1.5, "fair_yield": 0.03},
+        "base": {
+            "scenario": "base", "revenue": 1000, "operating_margin": 0.15,
+            "payout_ratio": 0.30, "shares_outstanding": 100, "prior_bps": 5.0,
+        },
+        "negative": {
+            "scenario": "negative", "revenue": 1000, "operating_margin": 0.15,
+            "payout_ratio": 0.30, "one_time_items": 50, "shares_outstanding": 100,
+            "prior_bps": 5.0,
+        },
+    }
+    r = client.post("/api/valuation", json=payload)
+    assert r.status_code == 200
+    body = r.json()
+    assert abs(body["base"]["projection"]["eps"] - 0.975) < 1e-9
+    assert abs(body["base"]["fair_value"]["per"]["fair_price"] - 14.625) < 1e-9
+    assert body["risk_reward"]["verdict"] == "損小利大"
+
+
+def test_company_valuation_saves_forecast(client):
+    client.post("/api/companies", json={"code": "6666", "name": "予想保存テスト"})
+    payload = {
+        "current_price": 10, "save": True, "fiscal_period": "2026-03",
+        "multiples": {"fair_per": 15},
+        "base": {"revenue": 1000, "operating_margin": 0.15, "payout_ratio": 0.3,
+                 "shares_outstanding": 100, "prior_bps": 5.0},
+        "negative": {"scenario": "negative", "revenue": 1000, "operating_margin": 0.15,
+                     "payout_ratio": 0.3, "one_time_items": 50,
+                     "shares_outstanding": 100, "prior_bps": 5.0},
+    }
+    r = client.post("/api/companies/6666/valuation", json=payload)
+    assert r.status_code == 200
+    assert r.json().get("saved") is True

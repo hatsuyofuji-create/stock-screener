@@ -69,3 +69,42 @@ class CompanyOut(BaseModel):
     moat_tags: Optional[str] = None
     qualitative_note: Optional[str] = None
     is_cyclical: bool = False
+
+
+# ---------- Phase 2: 適正株価・シナリオ（4.3） ----------
+
+class ScenarioIn(BaseModel):
+    """Park24 型シナリオ1本分の入力（仕様書 4.3 STEP1）。"""
+
+    scenario: str = "base"  # base / negative
+    revenue: Optional[float] = None
+    operating_margin: Optional[float] = None
+    payout_ratio: Optional[float] = None
+    dps: Optional[float] = None
+    one_time_items: float = 0.0
+    effective_tax_rate: float = 0.35
+    shares_outstanding: Optional[float] = None
+    prior_bps: Optional[float] = None
+    base_net_income: Optional[float] = None
+    base_eps: Optional[float] = None
+
+
+class FairMultiples(BaseModel):
+    """妥当倍率（本質的価値の閾値）。手動上書き可。"""
+
+    fair_per: Optional[float] = None
+    fair_pbr: Optional[float] = None
+    fair_yield: Optional[float] = None  # 妥当配当利回り（例 0.03）
+
+
+class ValuationIn(BaseModel):
+    """適正株価・安全域・リスクリワードの一括計算入力（仕様書 4.3）。"""
+
+    current_price: Optional[float] = None
+    multiples: FairMultiples = FairMultiples()
+    base: ScenarioIn
+    negative: Optional[ScenarioIn] = None
+    # 予想を Forecast テーブルへ保存するか（銘柄コードは URL パスで指定）
+    save: bool = False
+    fiscal_period: Optional[str] = None
+    source: str = "user_excel"
