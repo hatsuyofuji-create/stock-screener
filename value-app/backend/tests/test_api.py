@@ -1,9 +1,11 @@
 """API 統合テスト（Phase 0/1）。一時 SQLite を使う。"""
 
+import io
 import os
 import tempfile
 
 import pytest
+from openpyxl import Workbook
 
 # app を import する前にテスト用 DB を指定する。
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
@@ -126,3 +128,80 @@ def test_company_valuation_saves_forecast(client):
     r = client.post("/api/companies/6666/valuation", json=payload)
     assert r.status_code == 200
     assert r.json().get("saved") is True
+
+
+def _excel_bytes():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "予想"
+    ws["A1"] = "前提"
+    ws["B1"] = "国内堅調"
+    ws["A2"] = "売上高"
+    ws["B2"] = 1200
+    ws["A3"] = "営業利益"
+    ws["B3"] = 180
+    ws["A4"] = "予想EPS"
+    ws["B4"] = 1.2
+    ws["A5"] = "予想BPS"
+    ws["B5"] = 20.0
+    ws["A6"] = "予想DPS"
+    ws["B6"] = 0.36
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_excel_preview_and_extract(client):
+    """Phase 3: Excel プレビュー → 自動検出 → 抽出 → Forecast 保存。"""
+    client.post("/api/companies", json={"code": "5555", "name": "Excel取込テスト"})
+
+    files = {"file": ("f.xlsx", _excel_bytes(),
+                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post("/api/excel/preview", files=files)
+    assert r.status_code == 200
+    body = r.json()
+    file_id = body["file_id"]
+    sug = body["suggestions"]
+    assert sug["eps"]["value"] == 1.2
+
+    mapping = {f: {"sheet": sug[f]["sheet"], "cell": sug[f]["value_cell"]}
+               for f in ("eps", "bps", "dps", "revenue", "operating_income", "qualitative_note")}
+    r = client.post("/api/companies/5555/excel/extract", json={
+        "file_id": file_id, "mapping": mapping, "fiscal_period": "2026-03",
+        "save": True, "save_profile_as": "park24_annual",
+    })
+    assert r.status_code == 200
+    vals = r.json()["values"]
+    assert vals["eps"] == 1.2 and vals["bps"] == 20.0 and vals["dps"] == 0.36
+    assert r.json()["saved"] is True
+
+    # 定性メモが Excel の「前提」で上書きされている
+    assert "国内堅調" in client.get("/api/companies/5555").json()["qualitative_note"]
+
+    # マッピングが保存され再利用できる
+    profiles = client.get("/api/mapping_profiles").json()
+    assert any(p["format_name"] == "park24_annual" for p in profiles)
+
+
+def test_forecast_fscore_endpoint(client):
+    """Phase 3→4.2 接続：最新実績に予想値を上書きした予想Fスコア。"""
+    client.post("/api/companies", json={"code": "4444", "name": "予想Fスコア"})
+    prior = {"fiscal_period": "2024-03", "revenue": 1000, "operating_income": 100,
+             "ordinary_income": 90, "net_income": 60, "operating_cf": 80,
+             "total_assets": 1000, "equity": 500, "current_assets": 400,
+             "current_liabilities": 200, "interest_bearing_debt": 200, "capital_stock": 100}
+    latest = {"fiscal_period": "2025-03", "revenue": 1100, "operating_income": 110,
+              "ordinary_income": 100, "net_income": 70, "operating_cf": 90,
+              "total_assets": 1050, "equity": 560, "current_assets": 450,
+              "current_liabilities": 210, "interest_bearing_debt": 190, "capital_stock": 100}
+    client.post("/api/companies/4444/statements", json=prior)
+    client.post("/api/companies/4444/statements", json=latest)
+
+    # 予想で純利益を赤字化 → 項目1 が No になる
+    r = client.post("/api/companies/4444/fscore/forecast",
+                    json={"net_income": -10, "operating_income": 20})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mode"] == "forecast"
+    item1 = next(i for i in body["items"] if i["number"] == 1)
+    assert item1["passed"] is False

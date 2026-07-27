@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import String, Float, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Float, Integer, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -141,3 +141,18 @@ class Holding(Base):
     thesis: Mapped[Optional[str]] = mapped_column(String, nullable=True)       # 投資アイデア
 
     company: Mapped["Company"] = relationship(back_populates="holdings")
+
+
+class MappingProfile(Base):
+    """予想Excel のマッピング設定（仕様書 4.6）。銘柄・様式ごとに保存し再利用する。"""
+
+    __tablename__ = "mapping_profiles"
+    __table_args__ = (
+        UniqueConstraint("company_code", "format_name", name="uq_mapping_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    format_name: Mapped[str] = mapped_column(String, nullable=False)  # 例 "park24_annual"
+    # {"eps": {"sheet": "Sheet1", "cell": "C5"}, ...}
+    mapping: Mapped[dict] = mapped_column(JSON, nullable=False)

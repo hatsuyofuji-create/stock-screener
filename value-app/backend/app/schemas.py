@@ -108,3 +108,33 @@ class ValuationIn(BaseModel):
     save: bool = False
     fiscal_period: Optional[str] = None
     source: str = "user_excel"
+
+
+# ---------- Phase 3: 予想Excel 取り込み（4.6） ----------
+
+class CellRef(BaseModel):
+    sheet: Optional[str] = None
+    cell: str
+
+
+class MappingProfileIn(BaseModel):
+    """マッピング設定の保存。"""
+
+    format_name: str
+    company_code: Optional[str] = None
+    mapping: dict[str, CellRef]
+
+
+class ExtractIn(BaseModel):
+    """確定マッピングに基づく抽出＆Forecast保存の入力。
+
+    file_id は /api/excel/preview が返す一時ファイル ID。
+    """
+
+    file_id: str
+    mapping: dict[str, CellRef]
+    fiscal_period: Optional[str] = None
+    scenario: str = "base"
+    source: str = "user_excel"
+    save: bool = False
+    save_profile_as: Optional[str] = None  # 指定時、マッピングを名前付きで保存

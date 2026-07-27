@@ -17,8 +17,9 @@ from .db import get_db, init_db
 from . import models, schemas
 from .services import to_raw, sorted_statements, latest_and_prior
 from .engines.financials import compute_metrics, compute_changes
-from .engines.fscore import compute_fscore
+from .engines.fscore import compute_fscore, build_forecast_snapshot
 from .routers import valuation as valuation_router
+from .routers import excel as excel_router
 
 DISCLAIMER = (
     "本アプリは投資助言ツールではありません。投資判断は利用者自身の責任で行ってください。"
@@ -41,6 +42,7 @@ app.add_middleware(
 )
 
 app.include_router(valuation_router.router)
+app.include_router(excel_router.router)
 
 
 @app.get("/")
@@ -165,6 +167,28 @@ def get_fscore(code: str, effective_tax_rate: float = 0.30, db: Session = Depend
         raise HTTPException(status_code=400, detail="Fスコアには最低2期分の財務データが必要です")
     result = compute_fscore(
         to_raw(latest), to_raw(prior), mode="actual",
+        effective_tax_rate=effective_tax_rate,
+    )
+    return result.to_dict()
+
+
+@app.post("/api/companies/{code}/fscore/forecast")
+def get_forecast_fscore(code: str, overrides: dict, effective_tax_rate: float = 0.30,
+                        db: Session = Depends(get_db)):
+    """予想版Fスコア（仕様書 4.2）。最新実績に予想値(overrides)を上書きして算出する。
+
+    overrides 例（Excel 抽出値や Forecast から）:
+      {"revenue": 1200, "operating_income": 180, "net_income": 117, "ordinary_income": 180}
+    """
+    company = db.get(models.Company, code)
+    if not company:
+        raise HTTPException(status_code=404, detail="company not found")
+    latest, prior = latest_and_prior(company.statements)
+    if latest is None or prior is None:
+        raise HTTPException(status_code=400, detail="予想Fスコアには最低2期分の実績が必要です")
+    forecast_latest = build_forecast_snapshot(to_raw(latest), overrides or {})
+    result = compute_fscore(
+        forecast_latest, to_raw(prior), mode="forecast",
         effective_tax_rate=effective_tax_rate,
     )
     return result.to_dict()
