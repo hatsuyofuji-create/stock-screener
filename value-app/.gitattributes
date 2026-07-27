@@ -1,0 +1,3 @@
+# Windows バッチファイルは CRLF 改行で取得させる（cmd.exe の互換性のため）
+*.bat text eol=crlf
+起動方法.txt text eol=crlf
