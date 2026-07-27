@@ -205,3 +205,49 @@ def test_forecast_fscore_endpoint(client):
     assert body["mode"] == "forecast"
     item1 = next(i for i in body["items"] if i["number"] == 1)
     assert item1["passed"] is False
+
+
+def test_screening_and_matrix_flow(client):
+    """Phase 4: 市場データ登録 → 閾値/魔法の公式スクリーニング → マトリクス。"""
+    # 本命銘柄: 低PBR・高Fスコア・ネットキャッシュ
+    client.post("/api/companies", json={"code": "3333", "name": "本命工業"})
+    prior = {"fiscal_period": "2024-03", "revenue": 1000, "operating_income": 100,
+             "ordinary_income": 90, "net_income": 60, "operating_cf": 80, "investing_cf": -20,
+             "total_assets": 1000, "equity": 800, "current_assets": 400,
+             "current_liabilities": 100, "interest_bearing_debt": 50, "cash": 300,
+             "capital_stock": 100, "shares_outstanding": 100, "dps": 30}
+    latest = {"fiscal_period": "2025-03", "revenue": 1200, "operating_income": 150,
+              "ordinary_income": 140, "net_income": 95, "operating_cf": 160, "investing_cf": -30,
+              "total_assets": 1100, "equity": 900, "current_assets": 500,
+              "current_liabilities": 110, "interest_bearing_debt": 40, "cash": 350,
+              "capital_stock": 100, "shares_outstanding": 100, "dps": 40}
+    client.post("/api/companies/3333/statements", json=prior)
+    client.post("/api/companies/3333/statements", json=latest)
+    # BPS = 900/100 = 9.0、株価5 → PBR=0.556（低PBR）、利回り=40/5=8
+    client.put("/api/companies/3333/market", json={"price": 5.0, "price_3y_ago": 8.0})
+
+    # 閾値: ネットキャッシュ＋FCF>0＋Fスコア7以上
+    r = client.post("/api/screen/threshold", json={
+        "net_cash_required": True, "fcf_positive": True, "fscore_min": 7,
+    })
+    assert r.status_code == 200
+    assert any(h["code"] == "3333" for h in r.json()["hits"])
+
+    # 魔法の公式
+    r = client.post("/api/screen/magic?top_n=10")
+    assert r.status_code == 200
+    assert any(row["code"] == "3333" for row in r.json()["results"])
+
+    # マトリクス: 本命ゾーン判定
+    r = client.get("/api/matrix")
+    assert r.status_code == 200
+    pt = next(p for p in r.json()["points"] if p["code"] == "3333")
+    assert pt["quadrant"] == "honmei"
+
+    # スクリーニング設定の保存
+    r = client.post("/api/screen/settings", json={
+        "name": "ネットキャッシュ小型", "mode": "threshold",
+        "params": {"net_cash_required": True, "fscore_min": 7},
+    })
+    assert r.json()["saved"] is True
+    assert any(s["name"] == "ネットキャッシュ小型" for s in client.get("/api/screen/settings").json())

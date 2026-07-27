@@ -138,3 +138,33 @@ class ExtractIn(BaseModel):
     source: str = "user_excel"
     save: bool = False
     save_profile_as: Optional[str] = None  # 指定時、マッピングを名前付きで保存
+
+
+# ---------- Phase 4: スクリーニング・マトリクス（4.5 / 4.7） ----------
+
+class MarketDataIn(BaseModel):
+    price: Optional[float] = None
+    price_3y_ago: Optional[float] = None
+    as_of: Optional[str] = None
+    per: Optional[float] = None
+    pbr: Optional[float] = None
+    dividend_yield: Optional[float] = None
+
+
+class ThresholdIn(BaseModel):
+    """閾値フィルターの条件（None/False は OFF）。"""
+
+    dividend_yield_min: Optional[float] = None
+    equity_ratio_min: Optional[float] = None
+    net_cash_required: bool = False
+    fcf_positive: bool = False
+    roe_min: Optional[float] = None
+    market_cap_max: Optional[float] = None
+    price_change_3y_negative: bool = False
+    fscore_min: Optional[int] = None
+
+
+class ScreenSettingIn(BaseModel):
+    name: str
+    mode: str  # threshold / magic
+    params: dict

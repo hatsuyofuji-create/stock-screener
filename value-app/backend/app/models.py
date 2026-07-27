@@ -143,6 +143,32 @@ class Holding(Base):
     company: Mapped["Company"] = relationship(back_populates="holdings")
 
 
+class MarketData(Base):
+    """市場データ（株価・時価総額 等）。仕様書 4.9 で自動取得予定。当面は手動登録。"""
+
+    __tablename__ = "market_data"
+
+    company_code: Mapped[str] = mapped_column(ForeignKey("companies.code"), primary_key=True)
+    price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)          # 現在株価
+    price_3y_ago: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # 3年前株価
+    as_of: Mapped[Optional[str]] = mapped_column(String, nullable=True)           # 基準日
+    # 外部から直接与えられる場合の上書き（無ければ財務から導出）
+    per: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    pbr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    dividend_yield: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+
+class ScreenSetting(Base):
+    """スクリーニング設定の保存（仕様書 4.5：設定を保存できること）。"""
+
+    __tablename__ = "screen_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    mode: Mapped[str] = mapped_column(String, nullable=False)  # threshold / magic
+    params: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 class MappingProfile(Base):
     """予想Excel のマッピング設定（仕様書 4.6）。銘柄・様式ごとに保存し再利用する。"""
 

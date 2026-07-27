@@ -12,7 +12,8 @@
 - [x] **Phase 1** — 財務指標エンジン（4.1）＋ Fスコアエンジン（4.2）＝**心臓部**
 - [x] **Phase 2** — 適正株価・安全域 ＋ Park24型シナリオ計算（4.3）
 - [x] **Phase 3** — 予想Excelアップロード＆マッピング（4.6）
-- [ ] Phase 4 — スクリーニング＋銘柄マトリクス（4.5 / 4.7）
+- [x] **Phase 4（バックエンド）** — スクリーニング＋銘柄マトリクス データAPI（4.5 / 4.7）
+      ※散布図UIは React フロントエンド着手時に実装予定
 - [ ] Phase 5 — データ自動取得（EDINET/TDnet, 4.9）
 - [ ] Phase 6 — ポートフォリオ管理＋アラート＋景気局面（4.8 / 4.4）
 
@@ -31,9 +32,11 @@ value-app/
         fscore.py      4.2 Fスコア計算エンジン
         valuation.py   4.3 適正株価・安全域＋Park24型シナリオ
         excel_adapter.py 4.6 予想Excel 取り込み（検出・抽出）
+        screening.py   4.5/4.7 スクリーニング＋マトリクス
       routers/
         valuation.py   適正株価・シナリオ API
         excel.py       予想Excel アップロード＆マッピング API
+        screening.py   スクリーニング・マトリクス・市場データ API
       main.py          FastAPI エントリポイント
     tests/             pytest（計算の正しさを担保）
     seed.py            サンプル銘柄1社を投入
@@ -89,6 +92,11 @@ uvicorn app.main:app --reload  # http://127.0.0.1:8000/docs で API を確認
 | POST | `/api/excel/preview` | 予想Excel アップロード＋自動検出（4.6） |
 | POST | `/api/companies/{code}/excel/extract` | マッピング抽出＋Forecast保存（4.6） |
 | GET/POST | `/api/mapping_profiles` | マッピング設定の保存・再利用（4.6） |
+| PUT | `/api/companies/{code}/market` | 市場データ（株価等）登録 |
+| POST | `/api/screen/threshold` | 閾値フィルター（4.5 モードA） |
+| POST | `/api/screen/magic` | 魔法の公式（4.5 モードB） |
+| GET | `/api/matrix` | 銘柄マトリクス散布図データ（4.7） |
+| GET/POST | `/api/screen/settings` | スクリーニング設定の保存・再利用（4.5） |
 
 ## 設計メモ
 
