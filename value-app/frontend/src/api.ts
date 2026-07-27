@@ -173,7 +173,43 @@ export const api = {
     fd.append('file', file)
     return fetch(BASE + '/excel/preview', { method: 'POST', body: fd }).then((r) => {
       if (!r.ok) throw new Error(String(r.status))
-      return r.json()
+      return r.json() as Promise<ExcelPreviewResponse>
     })
   },
+  excelExtract: (code: string, body: ExcelExtractBody) =>
+    req<{ values: Record<string, number | string | null>; saved: boolean }>(
+      `/companies/${code}/excel/extract`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  forecastFscore: (code: string, overrides: Record<string, number>) =>
+    req<FScoreResult>(`/companies/${code}/fscore/forecast`, {
+      method: 'POST',
+      body: JSON.stringify(overrides),
+    }),
+}
+
+export interface ExcelSuggestion {
+  field: string
+  sheet: string
+  label_cell: string
+  value_cell: string | null
+  value: unknown
+}
+
+export interface ExcelPreviewResponse {
+  file_id: string
+  sheets: string[]
+  preview: Record<string, { cell: string; value: unknown }[][]>
+  suggestions: Record<string, ExcelSuggestion>
+  saved_profiles: unknown[]
+}
+
+export interface ExcelExtractBody {
+  file_id: string
+  mapping: Record<string, { sheet: string; cell: string }>
+  fiscal_period?: string | null
+  scenario?: string
+  source?: string
+  save?: boolean
+  save_profile_as?: string | null
 }
