@@ -7,3 +7,6 @@ venv/
 
 # Local secrets / env
 .env
+
+# value-app local DB
+value-app/backend/*.db
