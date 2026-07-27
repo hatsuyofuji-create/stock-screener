@@ -32,12 +32,19 @@ if errorlevel 1 (
 )
 
 rem ---- 初回セットアップ ----
-if not exist "backend\.venv" (
+if not exist "backend\.venv\Scripts\python.exe" (
   echo [初回セットアップ] Python 仮想環境を作成しています...
   %PY% -m venv backend\.venv
+)
+if not exist "backend\.venv\Scripts\uvicorn.exe" (
   echo [初回セットアップ] バックエンドの依存をインストールしています...
   backend\.venv\Scripts\python.exe -m pip install --upgrade pip
   backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+  if not exist "backend\.venv\Scripts\uvicorn.exe" (
+    echo [エラー] 依存インストールに失敗しました。ネット接続を確認して再実行してください。
+    pause
+    exit /b 1
+  )
 )
 if not exist "frontend\node_modules" (
   echo [初回セットアップ] フロントエンドの依存をインストールしています...

@@ -36,13 +36,25 @@ if errorlevel 1 (
   exit /b 1
 )
 
-rem ---- 初回セットアップ：バックエンド（Python 仮想環境＋依存）----
-if not exist "backend\.venv" (
+rem ---- 初回セットアップ：バックエンド（Python 仮想環境）----
+if not exist "backend\.venv\Scripts\python.exe" (
   echo [初回セットアップ] Python 仮想環境を作成しています...
   %PY% -m venv backend\.venv
+)
+
+rem ---- 初回セットアップ：依存（uvicorn 等）。前回途中で終わっても再実行される ----
+if not exist "backend\.venv\Scripts\uvicorn.exe" (
   echo [初回セットアップ] バックエンドの依存をインストールしています（数分かかります）...
   backend\.venv\Scripts\python.exe -m pip install --upgrade pip
   backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+  if not exist "backend\.venv\Scripts\uvicorn.exe" (
+    echo.
+    echo [エラー] 依存インストールに失敗しました。
+    echo         インターネット接続を確認して、もう一度このファイルを実行してください。
+    echo.
+    pause
+    exit /b 1
+  )
   echo.
 )
 
