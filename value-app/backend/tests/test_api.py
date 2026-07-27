@@ -291,3 +291,19 @@ def test_portfolio_holdings_and_alerts(client):
                        json={"confidence": 5, "upside": 0.3}).status_code == 200
     r = client.post("/api/portfolio/reevaluate", json={"margin_of_safety": 0.2, "fscore": 8})
     assert r.json()["would_buy"] is True
+
+
+def test_ingest_endpoint_mock(client):
+    """Phase 5: mock プロバイダで自動取得 → 保存 → 指標算出まで通る。"""
+    r = client.post("/api/companies/1111/ingest?provider=mock")
+    assert r.status_code == 200
+    assert r.json()["statements_added"] == 3
+
+    # 取得データから Fスコアが出る
+    r = client.get("/api/companies/1111/fscore")
+    assert r.status_code == 200
+    assert r.json()["total"] >= 1
+
+    # 一括取得
+    r = client.post("/api/ingest", json={"codes": ["1112", "1113"], "provider": "mock"})
+    assert r.json()["count"] == 2

@@ -22,6 +22,7 @@ from .routers import valuation as valuation_router
 from .routers import excel as excel_router
 from .routers import screening as screening_router
 from .routers import portfolio as portfolio_router
+from .routers import ingest as ingest_router
 
 DISCLAIMER = (
     "本アプリは投資助言ツールではありません。投資判断は利用者自身の責任で行ってください。"
@@ -47,6 +48,7 @@ app.include_router(valuation_router.router)
 app.include_router(excel_router.router)
 app.include_router(screening_router.router)
 app.include_router(portfolio_router.router)
+app.include_router(ingest_router.router)
 
 
 @app.get("/")

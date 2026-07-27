@@ -217,3 +217,10 @@ class PositionSizeIn(BaseModel):
 class ReevaluateIn(BaseModel):
     margin_of_safety: Optional[float] = None
     fscore: Optional[int] = None
+
+
+# ---------- Phase 5: データ自動取得（4.9） ----------
+
+class IngestIn(BaseModel):
+    codes: list[str]
+    provider: Optional[str] = None  # mock / jquants（未指定は環境変数 PROVIDER）

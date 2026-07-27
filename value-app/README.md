@@ -15,9 +15,12 @@
 - [x] **Phase 4（バックエンド）** — スクリーニング＋銘柄マトリクス データAPI（4.5 / 4.7）
       ※散布図UIは React フロントエンド着手時に実装予定
 - [x] **Phase 6** — 景気局面セレクター（4.4）＋ポートフォリオ管理・アラート（4.8）
-- [ ] Phase 5 — データ自動取得（EDINET/TDnet, 4.9）
+- [x] **Phase 5** — データ自動取得（J-Quants V2, 4.9）
 
 > Phase 6 は自動取得に依存しないため Phase 5 より先に実装（手動/自動どちらのデータでも動作）。
+
+**バックエンドの全6フェーズが完了**。次の候補：React フロントエンド（マトリクス散布図
+ほかダッシュボード）／EDINET(XBRL) による財務三表の網羅取得。
 
 ## 構成
 
@@ -37,11 +40,17 @@ value-app/
         screening.py   4.5/4.7 スクリーニング＋マトリクス
         business_cycle.py 4.4 景気局面セレクター
         portfolio.py   4.8 ポートフォリオ管理・アラート
+      data/            4.9 データ取得層（DataProvider 抽象）
+        provider.py    抽象＋ get_provider() ファクトリ
+        mock.py        MockProvider（鍵不要）
+        jquants.py     JQuantsProvider（J-Quants V2, x-api-key）
+      ingest.py        取得→DB upsert サービス
       routers/
         valuation.py   適正株価・シナリオ API
         excel.py       予想Excel アップロード＆マッピング API
         screening.py   スクリーニング・マトリクス・市場データ API
         portfolio.py   景気局面・保有・アラート API
+        ingest.py      データ自動取得 API
       main.py          FastAPI エントリポイント
     tests/             pytest（計算の正しさを担保）
     seed.py            サンプル銘柄1社を投入
@@ -109,6 +118,28 @@ uvicorn app.main:app --reload  # http://127.0.0.1:8000/docs で API を確認
 | GET | `/api/portfolio/diversification` | 分散チェック（4.8） |
 | POST | `/api/portfolio/position-size` | ポジションサイズ提案（4.8） |
 | POST | `/api/portfolio/reevaluate` | 非保有仮定の再評価（4.8） |
+| POST | `/api/companies/{code}/ingest` | 1銘柄を自動取得して保存（4.9） |
+| POST | `/api/ingest` | 複数銘柄を一括取得（4.9） |
+
+## データ自動取得（Phase 5 / 4.9）
+
+`DataProvider` 抽象で提供元を切り替え（環境変数 `PROVIDER` = `mock` / `jquants`）。
+
+- **mock**：鍵不要の決定論データ。テスト・デモ用。
+- **jquants**：J-Quants API V2（APIキー方式）。`JQUANTS_API_KEY` を設定。
+  `/fins/statements` で財務、`/equities/bars/daily` で株価を取得。
+
+```bash
+export PROVIDER=jquants
+export JQUANTS_API_KEY=<発行したAPIキー>
+# 例: 銘柄 7203 を取り込み
+curl -X POST 'http://127.0.0.1:8000/api/companies/7203/ingest?provider=jquants'
+```
+
+> 注：`/fins/statements` のサマリには BS 明細（棚卸資産・売上債権・有利子負債 等）が
+> 含まれないことがあり、取得できない項目は None のまま保存されます（下流の指標・Fスコアは
+> 欠損を安全側に扱う）。財務三表の網羅取得が必要なら EDINET(XBRL) の追加が将来課題です。
+> J-Quants のフィールド名は実レスポンスで要検証（`jquants.py` は候補名で緩く対応）。
 
 ## 設計メモ
 
