@@ -168,3 +168,52 @@ class ScreenSettingIn(BaseModel):
     name: str
     mode: str  # threshold / magic
     params: dict
+
+
+# ---------- Phase 6: 景気局面・ポートフォリオ（4.4 / 4.8） ----------
+
+class BusinessCycleIn(BaseModel):
+    phase: str
+    is_cyclical: bool = False
+
+
+class HoldingIn(BaseModel):
+    company_code: str
+    buy_price: Optional[float] = None
+    shares: Optional[float] = None
+    buy_date: Optional[str] = None
+    confidence: Optional[int] = None
+    thesis: Optional[str] = None
+
+
+class HoldingOut(HoldingIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class TakeProfitIn(BaseModel):
+    current_price: Optional[float] = None    # 未指定なら市場データを使用
+    fair_price: Optional[float] = None
+    overvalued_factor: float = 1.3
+    at_cycle_peak: bool = False
+    reached_hist_avg_valuation: bool = False
+    recovery_target_price: Optional[float] = None
+
+
+class StopLossIn(BaseModel):
+    current_price: Optional[float] = None
+    scenario_broken: bool = False
+    value_trap_persist: bool = False
+    pbr: Optional[float] = None       # 未指定なら snapshot から
+    fscore: Optional[int] = None      # 未指定なら snapshot から
+
+
+class PositionSizeIn(BaseModel):
+    confidence: Optional[int] = None
+    upside: Optional[float] = None
+    max_weight: float = 0.20
+
+
+class ReevaluateIn(BaseModel):
+    margin_of_safety: Optional[float] = None
+    fscore: Optional[int] = None

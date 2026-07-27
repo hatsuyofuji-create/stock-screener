@@ -251,3 +251,43 @@ def test_screening_and_matrix_flow(client):
     })
     assert r.json()["saved"] is True
     assert any(s["name"] == "ネットキャッシュ小型" for s in client.get("/api/screen/settings").json())
+
+
+def test_business_cycle_endpoint(client):
+    r = client.get("/api/business-cycle/phases")
+    assert len(r.json()["phases"]) == 8
+    r = client.post("/api/business-cycle", json={"phase": "順調な拡大"})
+    assert r.json()["recommended_method"] == "per"
+    r = client.post("/api/business-cycle", json={"phase": "順調な拡大", "is_cyclical": True})
+    assert r.json()["recommended_method"] == "pbr"
+
+
+def test_portfolio_holdings_and_alerts(client):
+    client.post("/api/companies", json={
+        "code": "2222", "name": "保有テスト", "sector": "機械", "growth_type": "安定成長",
+    })
+    client.put("/api/companies/2222/market", json={"price": 130})
+    r = client.post("/api/holdings", json={
+        "company_code": "2222", "buy_price": 100, "shares": 100,
+        "buy_date": "2022-01-01", "confidence": 4,
+    })
+    hid = r.json()["id"]
+
+    # 利確: 現在株価130 ≥ 適正株価100×1.3 → ポジション調整
+    r = client.post(f"/api/holdings/{hid}/take-profit", json={"fair_price": 100})
+    assert r.json()["action"] == "ポジション調整"
+
+    # 損切り: buy_date 2022 で含み損なら2年超だが、現在株価130>buy100 で含み損でない → 発火せず
+    r = client.post(f"/api/holdings/{hid}/stop-loss", json={"current_price": 80})
+    assert r.json()["triggered"] is True  # 80<100 かつ2年超
+
+    # 分散チェック
+    r = client.get("/api/portfolio/diversification")
+    assert r.status_code == 200
+    assert r.json()["count"] >= 1
+
+    # ポジションサイズ・再評価
+    assert client.post("/api/portfolio/position-size",
+                       json={"confidence": 5, "upside": 0.3}).status_code == 200
+    r = client.post("/api/portfolio/reevaluate", json={"margin_of_safety": 0.2, "fscore": 8})
+    assert r.json()["would_buy"] is True

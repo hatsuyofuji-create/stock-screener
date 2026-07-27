@@ -14,8 +14,10 @@
 - [x] **Phase 3** — 予想Excelアップロード＆マッピング（4.6）
 - [x] **Phase 4（バックエンド）** — スクリーニング＋銘柄マトリクス データAPI（4.5 / 4.7）
       ※散布図UIは React フロントエンド着手時に実装予定
+- [x] **Phase 6** — 景気局面セレクター（4.4）＋ポートフォリオ管理・アラート（4.8）
 - [ ] Phase 5 — データ自動取得（EDINET/TDnet, 4.9）
-- [ ] Phase 6 — ポートフォリオ管理＋アラート＋景気局面（4.8 / 4.4）
+
+> Phase 6 は自動取得に依存しないため Phase 5 より先に実装（手動/自動どちらのデータでも動作）。
 
 ## 構成
 
@@ -33,10 +35,13 @@ value-app/
         valuation.py   4.3 適正株価・安全域＋Park24型シナリオ
         excel_adapter.py 4.6 予想Excel 取り込み（検出・抽出）
         screening.py   4.5/4.7 スクリーニング＋マトリクス
+        business_cycle.py 4.4 景気局面セレクター
+        portfolio.py   4.8 ポートフォリオ管理・アラート
       routers/
         valuation.py   適正株価・シナリオ API
         excel.py       予想Excel アップロード＆マッピング API
         screening.py   スクリーニング・マトリクス・市場データ API
+        portfolio.py   景気局面・保有・アラート API
       main.py          FastAPI エントリポイント
     tests/             pytest（計算の正しさを担保）
     seed.py            サンプル銘柄1社を投入
@@ -97,6 +102,13 @@ uvicorn app.main:app --reload  # http://127.0.0.1:8000/docs で API を確認
 | POST | `/api/screen/magic` | 魔法の公式（4.5 モードB） |
 | GET | `/api/matrix` | 銘柄マトリクス散布図データ（4.7） |
 | GET/POST | `/api/screen/settings` | スクリーニング設定の保存・再利用（4.5） |
+| GET/POST | `/api/business-cycle` | 景気局面セレクター（4.4） |
+| GET/POST/DELETE | `/api/holdings` | 保有銘柄の管理（4.8） |
+| POST | `/api/holdings/{id}/take-profit` | 利確アラート（4.8） |
+| POST | `/api/holdings/{id}/stop-loss` | 損切りアラート（4.8） |
+| GET | `/api/portfolio/diversification` | 分散チェック（4.8） |
+| POST | `/api/portfolio/position-size` | ポジションサイズ提案（4.8） |
+| POST | `/api/portfolio/reevaluate` | 非保有仮定の再評価（4.8） |
 
 ## 設計メモ
 
