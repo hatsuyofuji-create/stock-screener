@@ -24,8 +24,27 @@ from src.universe import PERIODS, default_lag, to_yahoo_symbol
 st.set_page_config(page_title="自由ペア分析", page_icon="🔎", layout="wide")
 
 THRESHOLDS = {"±3%（標準）": 0.03, "±5%（大波のみ）": 0.05}
-DEFAULT_UNIVERSE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "universe", "leaders_jp_us.txt")
+_UNI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "universe")
+
+# 探索ユニバースのプリセット（複数ファイルを結合）
+PRESETS: dict[str, list[str]] = {
+    "日経225＋米国リーダー（推奨・広い）": ["us_leaders.txt", "nikkei225.txt"],
+    "日経225のみ": ["nikkei225.txt"],
+    "米国リーダー・指数のみ": ["us_leaders.txt"],
+    "スターター（少なめ・速い）": ["leaders_jp_us.txt"],
+}
+
+
+def _read_preset(file_names: list[str]) -> str:
+    parts: list[str] = []
+    for n in file_names:
+        try:
+            with open(os.path.join(_UNI_DIR, n), encoding="utf-8") as f:
+                parts.append(f"# ===== {n} =====\n" + f.read().strip())
+        except OSError:
+            pass
+    return "\n\n".join(parts) if parts else (
+        "^SOX 半導体指数\nNVDA エヌビディア\n8035 東京エレクトロン\n6857 アドバンテスト")
 
 
 @st.cache_data(show_spinner=False)
@@ -106,15 +125,17 @@ def tab_rank():
     top = c4.number_input("表示件数", 5, 100, 20, key="rk_top")
     mode = "time_lag" if mode_label.startswith("時間差") else "same_day"
 
-    st.markdown("**探索ユニバース**（1行1銘柄・`コード 名前`。米国株/指数もOK）")
-    default_text = ""
-    try:
-        with open(DEFAULT_UNIVERSE, encoding="utf-8") as f:
-            default_text = f.read()
-    except OSError:
-        default_text = "^SOX 半導体指数\nNVDA エヌビディア\n8035 東京エレクトロン\n6857 アドバンテスト"
-    uni_text = st.text_area("ユニバース", value=default_text, height=180,
-                            label_visibility="collapsed")
+    st.markdown("**探索ユニバース**（連動相手を探す銘柄群）")
+    preset = st.selectbox("プリセット", list(PRESETS), index=0, key="rk_preset")
+    default_text = _read_preset(PRESETS[preset])
+    # プリセットを変えると下の欄が入れ替わる（key に preset を含める）。自由に編集可。
+    uni_text = st.text_area(
+        "ユニバース", value=default_text, height=200, key=f"rk_uni_{preset}",
+        label_visibility="collapsed",
+        help="1行1銘柄・`コード 名前`。米国株/指数もOK。自由に追加・削除できます。")
+    n_syms = len(_parse_universe_text(uni_text)[0])
+    st.caption(f"探索対象: 約{n_syms}銘柄"
+               + ("（多いので取得に数分かかることがあります）" if n_syms > 60 else ""))
     only_leaders = st.checkbox("候補に『先行している』銘柄だけ表示（先行指標探し）", value=False)
     go = st.button("🔎 連動ランキングを出す", key="rk_go")
     if not go:

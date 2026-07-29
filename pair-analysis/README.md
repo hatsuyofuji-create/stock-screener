@@ -78,21 +78,34 @@ PRICE_PROVIDER=yahoo python scan.py --universe-file tickers.txt --period 半年 
 - **順（連れ高）/ 逆（ヘッジ候補）** を自動判定。逆相関はヘッジ相手探しに使える。
 
 ```bash
-# 本番: ディスコ(6146) の先行指標を 日本＋米国ユニバースから探す
-PRICE_PROVIDER=yahoo python find_peers.py 6146 \
-    --universe-file universe/leaders_jp_us.txt --period 2年 --top 20
+# 本番: ディスコ(6146) の先行指標を 日経225＋米国リーダー（既定）から探す
+PRICE_PROVIDER=yahoo python find_peers.py 6146 --period 2年 --top 20
 
 # 候補に「先行している」銘柄だけに絞る（先行指標探し）
 PRICE_PROVIDER=yahoo python find_peers.py 6146 --leaders-only
 
-# UI でも「連動ランキング」タブから同じことができます（ユニバースは画面で編集可）
+# ユニバースを指定（複数可）／自分のウォッチリストで
+PRICE_PROVIDER=yahoo python find_peers.py 6146 \
+    --universe-file universe/nikkei225.txt --universe-file universe/us_leaders.txt
+
+# UI でも「連動ランキング」タブから同じことができます（プリセット選択＋画面で編集可）
 PRICE_PROVIDER=yahoo streamlit run app.py
 ```
 
-**探索ユニバースの決め方**：`universe/leaders_jp_us.txt` を編集して銘柄を増減するだけ
-（1行 `コード 名前`）。米国株・指数（`^SOX` 等）も混ぜられます。自分のウォッチリストを
-そのまま貼ってもOK。東証全銘柄を対象にしたい場合は、全コードのリストを渡せば同じ仕組みで
-動きます（jp-sector-flow の J-Quants 連携から全銘柄リストを作る拡張も可能）。
+**探索ユニバース（`universe/`）**：既定は **日経225＋米国リーダー＝約250銘柄**。
+
+| プリセット | ファイル | 中身 |
+|---|---|---|
+| 日経225＋米国リーダー（推奨） | `nikkei225.txt` + `us_leaders.txt` | 約250銘柄 |
+| 日経225のみ | `nikkei225.txt` | 主要225銘柄 |
+| 米国リーダー・指数のみ | `us_leaders.txt` | 半導体・巨大テック・指数・商品 |
+| スターター（少なめ・速い） | `leaders_jp_us.txt` | 約90銘柄 |
+
+- ファイルは `コード 名前` の1行1銘柄。米国株・指数（`^SOX` 等）も混在OK。自由に増減できます。
+- **自分のウォッチリスト**をそのまま貼ってもOK（UIのユニバース欄に貼り付け）。
+- 銘柄が多いほど取得に時間がかかります（250銘柄で初回数分・2回目以降はキャッシュで高速）。
+- **東証全銘柄（約4000）** を対象にしたい場合は、全コードのリストファイルを渡せば同じ仕組みで
+  動きます（jp-sector-flow の J-Quants 連携から全銘柄リストを生成する拡張も可能）。
 
 ## シンボルの書き方（Yahoo Finance 記法）
 
