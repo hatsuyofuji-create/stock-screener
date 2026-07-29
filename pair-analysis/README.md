@@ -42,6 +42,17 @@ PRICE_PROVIDER=yahoo python analyze.py TSM 6146 --period 2年 --threshold 0.03
 PRICE_PROVIDER=yahoo streamlit run app.py          # スクショの Web UI
 ```
 
+### Windows：ダブルクリックで起動（推奨）
+
+`自由ペア分析アプリ起動.bat` をダブルクリックするだけで、UI（`app.py`）が
+ブラウザで開きます。
+
+- **初回だけ**自動で仮想環境（`.venv`）を作り、必要なパッケージを入れます（数分）。
+- 2回目以降はすぐ起動します。データは本番（yfinance）を使います。
+- 終了は黒い画面で **Ctrl+C**。
+- 事前に [Python](https://www.python.org/downloads/) が必要です
+  （インストール時「Add python.exe to PATH」にチェック）。
+
 ### 総当たりスキャン（「700万通り」構想版）
 
 全ペア（先行→後続）を測り、連動の強い順に並べます。同じ経済テーマ（`src/econ.py`）の
