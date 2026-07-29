@@ -12,6 +12,19 @@ echo ==========================================
 echo.
 echo Folder: "%CD%"
 
+rem --- Sanity check: the app files must sit next to this launcher ---
+if not exist "app.py" (
+    echo.
+    echo [ERROR] app.py was not found in this folder.
+    echo   This launcher must be in the SAME folder as:
+    echo     app.py , requirements.txt , the "src" folder , the "universe" folder
+    echo   Move this .bat into that folder ^(or move those files next to it^),
+    echo   then run again.
+    echo.
+    pause
+    exit /b 1
+)
+
 rem --- Warn if the folder path is very long (Windows ~260 char limit) ---
 call :strlen PATHLEN "%CD%"
 if %PATHLEN% GEQ 100 (
@@ -19,7 +32,6 @@ if %PATHLEN% GEQ 100 (
     echo [WARNING] This folder path is very long ^(%PATHLEN% chars^).
     echo   Windows may FAIL to create the Python environment on long paths.
     echo   Recommended: move this folder to a short path such as  C:\pair-analysis
-    echo   then run this file again.
     echo.
     pause
 )
@@ -45,9 +57,14 @@ if not exist ".venv\Scripts\python.exe" (
     echo [Setup] Creating virtual environment ...
     %PY% -m venv .venv
     if errorlevel 1 goto setup_error
-    echo [Setup] Installing packages ^(this takes a few minutes^) ...
     ".venv\Scripts\python.exe" -m pip install --upgrade pip >nul
-    ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+    echo [Setup] Installing packages ^(this takes a few minutes^) ...
+    if exist "requirements.txt" (
+        ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+    ) else (
+        echo   requirements.txt not found - installing by name instead ...
+        ".venv\Scripts\python.exe" -m pip install yfinance pandas streamlit
+    )
     if errorlevel 1 goto setup_error
     echo [Setup] Done.
     echo.
@@ -68,11 +85,9 @@ exit /b 0
 :setup_error
 echo.
 echo [ERROR] Setup failed.
-echo   Most common cause: the folder path is too long ^(see WARNING above^).
-echo   Fix: 1) delete the ".venv" folder here,
-echo        2) move this folder to a short path like  C:\pair-analysis
-echo        3) run this file again.
-echo   Also check your internet connection.
+echo   - Check your internet connection.
+echo   - If the path is long, move this folder to  C:\pair-analysis
+echo   - Delete the ".venv" folder here, then run this file again.
 pause
 exit /b 1
 
