@@ -1,0 +1,6 @@
+# pair-analysis 依存パッケージ
+# コア計算（src/analysis.py）は純Pythonで、テストだけなら追加依存は不要。
+# 本番データ取得と UI に以下が必要:
+yfinance>=0.2.40
+pandas>=2.0
+streamlit>=1.30
