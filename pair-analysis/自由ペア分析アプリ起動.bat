@@ -10,6 +10,20 @@ echo ==========================================
 echo    Free Pair Analysis - launcher
 echo ==========================================
 echo.
+echo Folder: "%CD%"
+
+rem --- Warn if the folder path is very long (Windows ~260 char limit) ---
+call :strlen PATHLEN "%CD%"
+if %PATHLEN% GEQ 100 (
+    echo.
+    echo [WARNING] This folder path is very long ^(%PATHLEN% chars^).
+    echo   Windows may FAIL to create the Python environment on long paths.
+    echo   Recommended: move this folder to a short path such as  C:\pair-analysis
+    echo   then run this file again.
+    echo.
+    pause
+)
+echo.
 
 rem --- Find Python (prefer the py launcher, else python) ---
 set "PY="
@@ -53,7 +67,22 @@ exit /b 0
 
 :setup_error
 echo.
-echo [ERROR] Setup failed. Check your internet connection and try again.
-echo   If it keeps failing, delete the ".venv" folder and run this file again.
+echo [ERROR] Setup failed.
+echo   Most common cause: the folder path is too long ^(see WARNING above^).
+echo   Fix: 1) delete the ".venv" folder here,
+echo        2) move this folder to a short path like  C:\pair-analysis
+echo        3) run this file again.
+echo   Also check your internet connection.
 pause
 exit /b 1
+
+rem --- helper: compute string length of %~2 into variable %~1 ---
+:strlen
+setlocal enabledelayedexpansion
+set "s=%~2"
+set "len=0"
+for %%N in (4096 2048 1024 512 256 128 64 32 16 8 4 2 1) do (
+    if "!s:~%%N,1!" neq "" ( set /a len+=%%N & set "s=!s:~%%N!" )
+)
+endlocal & set "%~1=%len%"
+goto :eof
