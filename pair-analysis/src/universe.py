@@ -67,6 +67,38 @@ def default_lag(leader: str) -> int:
     return _DEFAULT_LAG.get(classify_market(leader), 1)
 
 
+def load_universe_file(path: str) -> tuple[list[str], dict[str, str]]:
+    """
+    ユニバース定義ファイルを読み込み (シンボル一覧, 名前マップ) を返す。
+
+    書式（1行1銘柄）:
+        6146   ディスコ          # コードのあとに空白区切りで名前（任意）
+        NVDA   エヌビディア
+        # 先頭 # の行と空行は無視
+    シンボルは to_yahoo_symbol で正規化（6146 → 6146.T）。名前は表示用。
+    """
+    symbols: list[str] = []
+    names: dict[str, str] = {}
+    seen: set[str] = set()
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            line = line.split("#", 1)[0].strip()   # 行末コメント除去
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            sym = to_yahoo_symbol(parts[0])
+            if sym in seen:
+                continue
+            seen.add(sym)
+            symbols.append(sym)
+            if len(parts) > 1:
+                names[sym] = parts[1].strip()
+    return symbols, names
+
+
 # 期間ラベル → (yfinance period, おおよその営業日数)
 PERIODS: dict[str, tuple[str, int]] = {
     "半年": ("6mo", 120),
