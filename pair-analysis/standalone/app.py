@@ -445,6 +445,85 @@ def analyze_pair(leader, follower, dl, pl, df_, pf, lag=1, threshold=0.03):
                       [p / bl * 100 for p in pl], [p / bf * 100 for p in pf])
 
 
+# ── 連動率（同方向率）＋条件分解 ────────────────────────────────────────
+WEEKDAYS_JP = ["月", "火", "水", "木", "金", "土", "日"]
+
+
+def _sign(v):
+    return 1 if v > 0 else (-1 if v < 0 else 0)
+
+
+def same_dir_rate(x, y):
+    n = agree = 0
+    for a, b in zip(x, y):
+        sa, sb = _sign(a), _sign(b)
+        if sa == 0 or sb == 0:
+            continue
+        n += 1
+        if sa == sb:
+            agree += 1
+    return (agree / n if n else 0.0), n
+
+
+@dataclass
+class CoactStat:
+    overall: float
+    n: int
+    best_wd: int = -1
+    best_wd_rate: float = 0.0
+    recent: float = 0.0
+    prior: float = 0.0
+    trend: float = 0.0
+
+    def best_weekday_label(self):
+        return "-" if self.best_wd < 0 else f"{WEEKDAYS_JP[self.best_wd]}曜 {self.best_wd_rate*100:.0f}%"
+
+    def trend_label(self):
+        if self.trend > 0.05:
+            return f"上昇中(前{self.prior*100:.0f}→今{self.recent*100:.0f})"
+        if self.trend < -0.05:
+            return f"低下中(前{self.prior*100:.0f}→今{self.recent*100:.0f})"
+        return f"横ばい(前{self.prior*100:.0f}→今{self.recent*100:.0f})"
+
+
+def coactivity(dates, x, y, recent_frac=0.5, min_wd_days=8):
+    overall, n = same_dir_rate(x, y)
+    best_wd, best_rate = -1, 0.0
+    buckets = {i: ([], []) for i in range(5)}
+    for d, a, b in zip(dates, x, y):
+        try:
+            wd = _dt.date.fromisoformat(d).weekday()
+        except ValueError:
+            continue
+        if wd < 5:
+            buckets[wd][0].append(a)
+            buckets[wd][1].append(b)
+    for wd in range(5):
+        r, c = same_dir_rate(*buckets[wd])
+        if c >= min_wd_days and r > best_rate:
+            best_wd, best_rate = wd, r
+    m = len(x)
+    k = max(1, int(m * recent_frac))
+    prior, _ = same_dir_rate(x[:m - k], y[:m - k])
+    recent, _ = same_dir_rate(x[m - k:], y[m - k:])
+    return CoactStat(overall, n, best_wd, best_rate, recent, prior, recent - prior)
+
+
+def _aligned_at_lag(ret_dates, t_ret, c_ret, lag):
+    if lag > 0:
+        x, y = c_ret[:len(c_ret) - lag], t_ret[lag:]
+        pd_ = ret_dates[:len(x)]
+    elif lag < 0:
+        k = -lag
+        x, y = c_ret[k:], t_ret[:len(t_ret) - k]
+        pd_ = ret_dates[k:k + len(x)]
+    else:
+        x, y = c_ret, t_ret
+        pd_ = ret_dates[:len(x)]
+    m = min(len(x), len(y), len(pd_))
+    return pd_[:m], x[:m], y[:m]
+
+
 # ── 連動ランキング ─────────────────────────────────────────────────────
 def corr_beta_at_lag(t_ret, c_ret, lag):
     if lag > 0:
@@ -486,10 +565,15 @@ class RankRow:
     relation: str
     strength: str
     lead_note: str
+    coact: float = 0.0
+    coact_best_wd: str = "-"
+    coact_trend: str = ""
+    coact_recent: float = 0.0
+    coact_prior: float = 0.0
 
 
-def rank_peers(target, td, tp, cands, names, mode="time_lag", min_days=30,
-               lags=(-2, -1, 0, 1, 2, 3)):
+def rank_peers(target, td, tp, cands, names, mode="time_lag", sort_by="coact",
+               min_days=30, lags=(-2, -1, 0, 1, 2, 3)):
     rows = []
     for sym, (cd, cp) in cands.items():
         if sym == target:
@@ -505,19 +589,27 @@ def rank_peers(target, td, tp, cands, names, mode="time_lag", min_days=30,
             if n >= min_days and abs(r) > abs(best_corr):
                 best_lag, best_corr, best_beta = L, r, b
         key = best_corr if mode == "time_lag" else corr0
+        use_lag = best_lag if mode == "time_lag" else 0
         if best_lag > 0:
             note = f"{sym} が {best_lag}日先行"
         elif best_lag < 0:
             note = f"{target} が {-best_lag}日先行"
         else:
             note = "同時"
+        pd_, x, y = _aligned_at_lag(_d[1:], t_ret, c_ret, use_lag)
+        co = coactivity(pd_, x, y)
         rows.append(RankRow(sym, names.get(sym, ""), len(t_ret), corr0, best_lag,
                             best_corr, best_beta,
                             "順（連れ高）" if key >= 0 else "逆（ヘッジ候補）",
-                            _strength(key), note))
-    keyfn = ((lambda r: abs(r.best_corr)) if mode == "time_lag"
-             else (lambda r: abs(r.corr0)))
-    rows.sort(key=keyfn, reverse=True)
+                            _strength(key), note,
+                            co.overall, co.best_weekday_label(), co.trend_label(),
+                            co.recent, co.prior))
+    if sort_by == "coact":
+        rows.sort(key=lambda r: r.coact, reverse=True)
+    elif mode == "time_lag":
+        rows.sort(key=lambda r: abs(r.best_corr), reverse=True)
+    else:
+        rows.sort(key=lambda r: abs(r.corr0), reverse=True)
     return rows
 
 
@@ -624,12 +716,14 @@ def tab_pair():
 def tab_rank():
     st.caption("候補1銘柄を入れると、ユニバースから動きが連動する銘柄を探して並べます。"
                "『先行→後続』重視だと、候補に先行している＝先行指標になりうる銘柄が上位に出ます。")
-    c1, c2, c3, c4 = st.columns([2, 1.5, 2, 1.5])
+    c1, c2, c3, c4, c5 = st.columns([2, 1.3, 1.8, 1.8, 1.2])
     target_in = c1.text_input("候補銘柄", "6146", key="r_t")
     period = c2.selectbox("期間", list(PERIODS), index=2, key="r_p")
     mode_label = c3.selectbox("並べ方", ["時間差（先行→後続）重視", "同日連動を重視"], key="r_m")
-    top = c4.number_input("表示件数", 5, 100, 20, key="r_top")
+    sort_label = c4.selectbox("順位づけ", ["連動率（同方向率）", "相関の強さ"], key="r_sort")
+    top = c5.number_input("表示件数", 5, 100, 20, key="r_top")
     mode = "time_lag" if mode_label.startswith("時間差") else "same_day"
+    sort_by = "coact" if sort_label.startswith("連動率") else "corr"
 
     st.markdown("**探索ユニバース**（連動相手を探す銘柄群）")
     preset = st.selectbox("プリセット", list(PRESETS), index=0, key="r_pre")
@@ -662,22 +756,29 @@ def tab_rank():
         prog.progress((i + 1) / total, text=f"データ取得中… {i+1}/{total}")
     prog.empty()
 
-    rows = rank_peers(target, td, tp, hist, names, mode)
+    rows = rank_peers(target, td, tp, hist, names, mode, sort_by)
     if only_leaders:
         rows = [r for r in rows if r.best_lag > 0]
     if not rows:
         st.warning("該当がありませんでした。")
         return
     st.success(f"{target} {names.get(target,'')} と連動する銘柄  上位{int(top)}"
-               f"（{mode_label}・共通{rows[0].n_days}日で測定）")
+               f"（{mode_label}・{sort_label}順・共通{rows[0].n_days}日で測定）")
     table = pd.DataFrame([{
-        "銘柄": r.symbol, "名前": r.name, "相関": round(r.best_corr, 2),
-        "β(%)": round(r.best_beta*100, 1), "関係": r.relation, "強さ": r.strength,
-        "時間差": r.lead_note, "同日相関": round(r.corr0, 2),
+        "銘柄": r.symbol, "名前": r.name,
+        "連動率%": round(r.coact*100, 1),
+        "曜日ベスト": r.coact_best_wd,
+        "トレンド": r.coact_trend,
+        "関係": r.relation,
+        "時間差": r.lead_note,
+        "相関": round(r.best_corr, 2),
+        "β(%)": round(r.best_beta*100, 1),
     } for r in rows[:int(top)]])
     st.dataframe(table, use_container_width=True, hide_index=True)
-    st.bar_chart(table.set_index("銘柄")["相関"])
-    st.caption("※ 過去の統計であり将来を保証しません。売買は自己責任で。")
+    st.bar_chart(table.set_index("銘柄")["連動率%"])
+    st.caption("連動率＝同じ日（時間差考慮）に同じ方向へ動いた割合。"
+               "『曜日ベスト』はその曜日だけの連動率、『トレンド』は 以前→直近 の変化。"
+               "※ 過去の統計であり将来を保証しません。売買は自己責任で。")
 
 
 st.markdown("### 🔎 自由ペア分析 / 連動ランキング")

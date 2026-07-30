@@ -41,4 +41,8 @@ def get_provider(name: str | None = None) -> PriceProvider:
     if name in ("yahoo", "yfinance", "yf"):
         from .yahoo import YahooProvider
         return YahooProvider()
-    raise ValueError(f"未知の PRICE_PROVIDER です: {name!r}（'synthetic' か 'yahoo'）")
+    if name in ("jquants", "jq"):
+        from .jquants import JQuantsProvider
+        return JQuantsProvider()
+    raise ValueError(
+        f"未知の PRICE_PROVIDER です: {name!r}（'synthetic' / 'yahoo' / 'jquants'）")

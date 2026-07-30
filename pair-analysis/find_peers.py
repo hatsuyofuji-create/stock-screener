@@ -72,19 +72,19 @@ def run(target_in: str, universe_files: list[str], period_label: str,
         except Exception as e:  # noqa: BLE001
             print(f"  スキップ {s}: {e}", file=sys.stderr)
 
-    rows = rank_peers(target, td, tp, hist, names=names, mode=mode)
+    rows = rank_peers(target, td, tp, hist, names=names, mode=mode, sort_by="coact")
     if leaders_only:
         rows = [r for r in rows if r.best_lag > 0]
 
     tname = names.get(target, "")
     mode_label = "時間差（先行→後続）" if mode == "time_lag" else "同日連動"
     print(f"■ {target} {tname} と連動する銘柄  上位{top}"
-          f"（{period_label}・{mode_label}）")
-    print(f"  {'銘柄':<10}{'名前':<14}{'相関':>6}{'β':>7}  関係 / 時間差")
+          f"（{period_label}・{mode_label}・連動率順）")
+    print(f"  {'銘柄':<9}{'名前':<12}{'連動率':>6} {'曜日ベスト':>9}  時間差 / トレンド")
     for r in rows[:top]:
-        nm = (r.name[:12] if r.name else "")
-        print(f"  {r.symbol:<10}{nm:<14}{r.best_corr:+5.2f}{r.best_beta*100:+6.1f}%  "
-              f"{r.relation}・{r.strength}・{r.lead_note}")
+        nm = (r.name[:10] if r.name else "")
+        print(f"  {r.symbol:<9}{nm:<12}{r.coact*100:5.1f}% {r.coact_best_wd:>9}  "
+              f"{r.lead_note}・{r.coact_trend}")
     if not rows:
         print("  （該当なし。ユニバースや期間を見直してください）")
     return 0

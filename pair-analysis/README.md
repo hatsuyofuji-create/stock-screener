@@ -107,6 +107,37 @@ PRICE_PROVIDER=yahoo streamlit run app.py
 - **東証全銘柄（約4000）** を対象にしたい場合は、全コードのリストファイルを渡せば同じ仕組みで
   動きます（jp-sector-flow の J-Quants 連携から全銘柄リストを生成する拡張も可能）。
 
+## 連動率（同方向率）と条件分解 ← 主指標
+
+「相関」は統計のPearson相関ではなく、**連動率＝同じ日（時間差考慮）に同じ方向へ動いた割合(%)**
+を主指標にしています（ランダム50%、強く連れて動くほど70〜95%）。各ペアに次を付けます:
+
+- **曜日ベスト**：その曜日だけの連動率（例「月曜 95%」）
+- **トレンド**：以前→直近の変化（例「上昇中(前50→今90)」）。“今効いているか”を見る
+
+連動ランキングの「順位づけ」で **連動率／相関** を切り替えられます。
+
+## 総当たりスキャン（`scan_all.py`）— 700万通りの自動マッチング
+
+先行群 × 後続群 を**両方向**で総当たりし、**連動率の高い順**にCSV出力します。
+
+```bash
+# 米国リーダー × 日経225（両方向, 連動率70%以上だけ）
+PRICE_PROVIDER=yahoo python scan_all.py \
+    --leaders-file universe/us_leaders.txt \
+    --followers-file universe/nikkei225.txt --min-coact 0.7 --out scan.csv
+
+# 日本株 全銘柄（約4000）を後続に（J-Quants・要APIキー）
+PRICE_PROVIDER=jquants python scan_all.py --jp-followers-all --top 100 --out scan.csv
+```
+
+出力列：`先行 / 後続 / 連動率% / 先行日数 / 相関 / 曜日ベスト / トレンド / 直近% / 以前% / 日数`
+
+### データ源（`PRICE_PROVIDER`）
+- `synthetic`（既定・鍵不要・テスト用）/ `yahoo`（yfinance）/ **`jquants`（日本株全銘柄・要 `JQUANTS_API_KEY`）**
+- J-Quants は「日付ごとに全銘柄」を1系統で取得するので、日本株4000の総当たりに向く。
+  jp-sector-flow と同じ V2・APIキー方式（`JQUANTS_API_KEY` を環境変数に設定）。
+
 ## シンボルの書き方（Yahoo Finance 記法）
 
 | 市場 | 例 |
