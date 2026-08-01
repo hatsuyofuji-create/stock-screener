@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.compute import money_flow as flow_mod  # noqa: E402
 from src.data.provider import get_provider  # noqa: E402
+from src.data import sox as sox_mod  # noqa: E402
 from src.notify import line as line_notify  # noqa: E402
 
 DB_DIR = ROOT / "db"
@@ -55,12 +56,26 @@ def _pm(v) -> str:
     return f"🟢+{v:.1f}%" if v >= 0 else f"🔴{v:.1f}%"
 
 
-def _build_message(ranking, asof) -> str:
-    lines = [f"📊 セクター資金フロー {asof.strftime('%Y-%m-%d')}", "売買代金 上位業種（価格の方向 15/30/150日）:"]
+def _four(m: dict, keys=(5, 15, 30, 150)) -> str:
+    """5/15/30/150日の方向を1行にまとめる。m のキーは int でも str でも可。"""
+    def g(k):
+        return m.get(k, m.get(str(k)))
+    return f"5日{_pm(g(5))} / 15日{_pm(g(15))} / 30日{_pm(g(30))} / 150日{_pm(g(150))}"
+
+
+def _build_message(ranking, asof, sox=None) -> str:
+    lines = [f"📊 セクター資金フロー {asof.strftime('%Y-%m-%d')}"]
+    if sox:
+        lines.append(f"参考 SOX指数(米・半導体) {sox['level']:,.0f}")
+        lines.append(f"　　{_four(sox['mom'])}")
+        lines.append("")
+    lines.append("売買代金 上位業種（価格の方向 5/15/30/150日）:")
     for _, row in ranking.head(TOP_N).iterrows():
+        pm = {5: row.get("price_mom_5"), 15: row.get("price_mom_15"),
+              30: row.get("price_mom_30"), 150: row.get("price_mom_150")}
         lines.append(
             f"{int(row['rank'])}. {row['sector']}　{row['turnover']:,.0f}億円\n"
-            f"　　15日{_pm(row.get('price_mom_15'))} / 30日{_pm(row.get('price_mom_30'))} / 150日{_pm(row.get('price_mom_150'))}"
+            f"　　{_four(pm)}"
         )
     lines.append("")
     lines.append("📈 全業種ランキング:")
@@ -107,8 +122,18 @@ def main() -> int:
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
+    # 参考指標: SOX（米・半導体）。取得失敗しても本体は続行。
+    sox = sox_mod.get_sox()
+    if sox:
+        (DB_DIR / "sox.json").write_text(
+            json.dumps(sox, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(f"SOX: {sox['level']} ({sox['asof']})")
+    else:
+        print("SOX: 取得できませんでした（参考指標のみ・本体は継続）")
+
     # 通知
-    message = _build_message(ranking, asof)
+    message = _build_message(ranking, asof, sox=sox)
     line_notify.notify(message)
 
     top_str = " / ".join(meta["top"])
