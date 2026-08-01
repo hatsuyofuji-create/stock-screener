@@ -86,8 +86,9 @@ def _build_message(ranking, asof, sox=None) -> str:
 def main() -> int:
     load_dotenv(ROOT / ".env")
 
-    if not is_weekday():
-        print("本日は土日のためスキップしました。")
+    force = os.getenv("FORCE_RUN", "").strip().lower() in ("1", "true", "yes")
+    if not is_weekday() and not force:
+        print("本日は土日のためスキップしました。（FORCE_RUN=true で強制実行できます）")
         return 0
 
     provider = get_provider()
