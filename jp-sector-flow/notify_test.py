@@ -34,6 +34,11 @@ def main() -> int:
     if meta_path.exists():
         asof = json.loads(meta_path.read_text(encoding="utf-8")).get("asof", "")
 
+    sox = None
+    sox_path = ROOT / "db" / "sox.json"
+    if sox_path.exists():
+        sox = json.loads(sox_path.read_text(encoding="utf-8"))
+
     def pm(v) -> str:
         if v is None or pd.isna(v):
             return "—"
@@ -42,12 +47,24 @@ def main() -> int:
     def col(r, name):
         return r[name] if name in r else None
 
+    def four(m) -> str:
+        def g(k):
+            return m.get(k, m.get(str(k)))
+        return f"5日{pm(g(5))} / 15日{pm(g(15))} / 30日{pm(g(30))} / 150日{pm(g(150))}"
+
     page_url = os.getenv("PAGE_URL") or "https://hatsuyofuji-create.github.io/stock-screener/sector-flow/"
-    lines = [f"📊 セクター資金フロー {asof}（テスト送信）", "売買代金 上位業種（価格の方向 15/30/150日）:"]
+    lines = [f"📊 セクター資金フロー {asof}（テスト送信）"]
+    if sox:
+        lines.append(f"参考 SOX指数(米・半導体) {sox['level']:,.0f}")
+        lines.append(f"　　{four(sox['mom'])}")
+        lines.append("")
+    lines.append("売買代金 上位業種（価格の方向 5/15/30/150日）:")
     for _, r in rank.head(TOP_N).iterrows():
+        pmm = {5: col(r, "price_mom_5"), 15: col(r, "price_mom_15"),
+               30: col(r, "price_mom_30"), 150: col(r, "price_mom_150")}
         lines.append(
             f"{int(r['rank'])}. {r['sector']}　{r['turnover']:,.0f}億円\n"
-            f"　　15日{pm(col(r,'price_mom_15'))} / 30日{pm(col(r,'price_mom_30'))} / 150日{pm(col(r,'price_mom_150'))}"
+            f"　　{four(pmm)}"
         )
     lines.append("")
     lines.append("📈 全業種ランキング:")

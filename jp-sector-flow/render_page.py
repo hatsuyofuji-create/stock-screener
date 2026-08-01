@@ -28,9 +28,13 @@ def build_payload() -> dict:
     meta_path = DB / "meta.json"
     if meta_path.exists():
         asof = json.loads(meta_path.read_text(encoding="utf-8")).get("asof", "")
+    sox = None
+    sox_path = DB / "sox.json"
+    if sox_path.exists():
+        sox = json.loads(sox_path.read_text(encoding="utf-8"))
     # NaN を None（JSONのnull）にして渡す
     records = ranking.where(pd.notnull(ranking), None).to_dict(orient="records")
-    return {"ranking": records, "asof": asof}
+    return {"ranking": records, "asof": asof, "sox": sox}
 
 
 def main() -> int:
