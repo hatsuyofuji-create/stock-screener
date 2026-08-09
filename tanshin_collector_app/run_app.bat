@@ -1,23 +1,42 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
-
-rem --- Python を自動で探す（.venv → py → python の順） ---
 set "PY="
+
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
-if not defined PY py -3 --version >nul 2>nul && set "PY=py -3"
-if not defined PY python --version >nul 2>nul && set "PY=python"
+if defined PY goto found
 
-if not defined PY (
-  echo.
-  echo [エラー] Python が見つかりませんでした。先に setup.bat を実行するか、
-  echo Python をインストールしてください（Add python.exe to PATH にチェック）。
-  echo.
-  pause
-  exit /b 1
-)
+py -3 --version >nul 2>nul
+if not errorlevel 1 set "PY=py -3"
+if defined PY goto found
 
-echo アプリを起動します...
-echo ブラウザが開かない場合は http://localhost:8502 を開いてください。
+python --version >nul 2>nul
+if not errorlevel 1 set "PY=python"
+if defined PY goto found
+
+for %%D in (
+  "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+  "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+  "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+  "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+  "C:\Python313\python.exe"
+  "C:\Python312\python.exe"
+  "C:\Python311\python.exe"
+) do if not defined PY if exist %%~D set "PY=%%~D"
+if defined PY goto found
+
+goto nopy
+
+:found
+echo Using Python: %PY%
+echo Starting app... If the browser does not open, go to http://localhost:8502
 %PY% -m streamlit run tanshin_collector.py --server.port 8502
 pause
+exit /b 0
+
+:nopy
+echo.
+echo [ERROR] Python not found. Run setup.bat first, or install Python.
+echo https://www.python.org/downloads/  (check "Add python.exe to PATH")
+echo.
+pause
+exit /b 1

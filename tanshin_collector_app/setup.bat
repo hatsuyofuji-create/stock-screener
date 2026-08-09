@@ -1,31 +1,49 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
-
-rem --- Python を自動で探す（.venv → py → python の順） ---
 set "PY="
+
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
-if not defined PY py -3 --version >nul 2>nul && set "PY=py -3"
-if not defined PY python --version >nul 2>nul && set "PY=python"
+if defined PY goto found
 
-if not defined PY (
-  echo.
-  echo [エラー] Python が見つかりませんでした。
-  echo   1) https://www.python.org/downloads/ から Python をインストール
-  echo   2) インストール画面で「Add python.exe to PATH」に必ずチェック
-  echo   3) パソコンを再起動してから、もう一度この setup.bat を実行
-  echo.
-  pause
-  exit /b 1
-)
+py -3 --version >nul 2>nul
+if not errorlevel 1 set "PY=py -3"
+if defined PY goto found
 
-echo 使用する Python: %PY%
-echo 必要なライブラリをインストールします（初回だけ・数分かかります）...
+python --version >nul 2>nul
+if not errorlevel 1 set "PY=python"
+if defined PY goto found
+
+for %%D in (
+  "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+  "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+  "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+  "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+  "C:\Python313\python.exe"
+  "C:\Python312\python.exe"
+  "C:\Python311\python.exe"
+) do if not defined PY if exist %%~D set "PY=%%~D"
+if defined PY goto found
+
+goto nopy
+
+:found
+echo Using Python: %PY%
+echo Installing libraries... please wait a few minutes.
 echo.
 %PY% -m pip install -r requirements.txt
 echo.
-echo ============================================================
-echo  完了しました。
-echo  このウィンドウを閉じて、run_app.bat をダブルクリックしてください。
-echo ============================================================
+echo ==== DONE ====
+echo Close this window, then double-click run_app.bat
 pause
+exit /b 0
+
+:nopy
+echo.
+echo [ERROR] Python not found on this PC.
+echo.
+echo 1. Install Python:  https://www.python.org/downloads/
+echo 2. On the FIRST install screen, check  "Add python.exe to PATH"
+echo 3. Restart the PC, then run setup.bat again.
+echo.
+pause
+exit /b 1
