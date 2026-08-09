@@ -1,0 +1,5 @@
+anthropic>=0.116.0
+openpyxl>=3.1
+requests>=2.31
+# pdfplumber はテキスト事前抽出のフォールバック用（任意）
+pdfplumber>=0.11
