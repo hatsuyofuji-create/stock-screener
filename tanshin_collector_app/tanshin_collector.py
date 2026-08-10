@@ -253,11 +253,44 @@ _FNAME_PAT = re.compile(r"(\d{4})_Q([1-4])")
 
 
 def _get_api_key():
-    """Claude APIキー（secrets.toml [anthropic] api_key、なければ環境変数）。無ければNone。"""
+    """Claude APIキーを探す。見つからなければ None。優先順:
+      1) Streamlitのsecrets（[anthropic] api_key）
+      2) 環境変数 ANTHROPIC_API_KEY
+      3) このファイルの場所→上位フォルダ→ホーム の .streamlit/secrets.toml を直接読む
+         （業績予想アプリ側の secrets.toml を、サブフォルダから実行しても拾えるように）
+    """
+    # 1) Streamlit の secrets
     try:
-        return st.secrets["anthropic"]["api_key"]
+        v = st.secrets["anthropic"]["api_key"]
+        if v:
+            return v
     except Exception:
-        return os.environ.get("ANTHROPIC_API_KEY")
+        pass
+    # 2) 環境変数
+    v = os.environ.get("ANTHROPIC_API_KEY")
+    if v:
+        return v
+    # 3) 近く/上位/ホーム の .streamlit/secrets.toml を直接パース
+    try:
+        import tomllib  # Python 3.11+ 標準
+    except Exception:
+        tomllib = None
+    if tomllib:
+        seen = set()
+        for base in (BASE_DIR, BASE_DIR.parent, BASE_DIR.parent.parent, Path.home()):
+            f = base / ".streamlit" / "secrets.toml"
+            if f in seen:
+                continue
+            seen.add(f)
+            try:
+                if f.is_file():
+                    data = tomllib.loads(f.read_text(encoding="utf-8"))
+                    key = (data.get("anthropic") or {}).get("api_key")
+                    if key:
+                        return key
+            except Exception:
+                continue
+    return None
 
 
 def list_saved_pdfs(code: str) -> dict:
