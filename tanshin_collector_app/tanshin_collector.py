@@ -57,6 +57,44 @@ def _safe_name(s: str) -> str:
     return re.sub(r'[\\/:*?"<>|]', "_", s).strip() or "unknown"
 
 
+def _out_root() -> Path:
+    """保存先の「決算短信PDF」フォルダを決める。
+    既存の「決算短信PDF」を、このファイルの場所→1つ上→2つ上 の順に探し、
+    見つかればそれを使う（＝業績予想アプリの共有フォルダに入る）。
+    無ければ自分の隣に新規作成する。"""
+    for base in (BASE_DIR, BASE_DIR.parent, BASE_DIR.parent.parent):
+        cand = base / "決算短信PDF"
+        if cand.is_dir():
+            return cand
+    return OUT_ROOT
+
+
+def _resolve_out_dir(code: str) -> Path:
+    """コードの保存フォルダを返す。今まで通り『コード+会社名』にする。
+    - 既にコードで始まるフォルダ（例: 6141DMG森精機）があればそれを再利用
+    - 無ければ、登録DBの会社名を付けて {コード}{会社名}
+    - 会社名が分からなければ {コード} のみ
+    """
+    root = _out_root()
+    root.mkdir(parents=True, exist_ok=True)
+    code = str(code)
+    # 既存の「コードで始まる」フォルダを再利用（今までのフォルダにそのまま入れる）
+    if root.exists():
+        for d in sorted(root.iterdir()):
+            if d.is_dir() and d.name.startswith(code):
+                return d
+    # 会社名を付けて新規（登録DBから引く）
+    name = ""
+    try:
+        st = database.get_stock(code)
+        if st and st.get("name"):
+            name = st["name"]
+    except Exception:
+        name = ""
+    folder = _safe_name(f"{code}{name}") if name else _safe_name(code)
+    return root / folder
+
+
 def _parse_period(title: str):
     """短信タイトルから (期, Q) を判定。四半期表記が無ければ通期＝Q4。"""
     fy = None
@@ -134,7 +172,7 @@ def collect_tanshin(code: str, start_fy: int, progress=None) -> dict:
                 or (x["corrected"] and not prev["corrected"]):
             picked[key] = x
 
-    out_dir = OUT_ROOT / _safe_name(code)
+    out_dir = _resolve_out_dir(code)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     saved, errors = [], []
@@ -197,7 +235,7 @@ def _get_api_key():
 
 def list_saved_pdfs(code: str) -> dict:
     """保存フォルダのPDFを (期,Q) ごとに1つ返す（訂正版があれば優先）。"""
-    folder = OUT_ROOT / _safe_name(code)
+    folder = _resolve_out_dir(code)
     picked: dict[tuple, Path] = {}
     if not folder.exists():
         return picked
