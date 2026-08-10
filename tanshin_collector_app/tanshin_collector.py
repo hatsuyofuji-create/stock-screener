@@ -59,13 +59,24 @@ def _safe_name(s: str) -> str:
 
 def _out_root() -> Path:
     """保存先の「決算短信PDF」フォルダを決める。
-    既存の「決算短信PDF」を、このファイルの場所→1つ上→2つ上 の順に探し、
-    見つかればそれを使う（＝業績予想アプリの共有フォルダに入る）。
-    無ければ自分の隣に新規作成する。"""
+    このファイルの場所→1つ上→2つ上 の中から既存の「決算短信PDF」を探し、
+    **既存の銘柄フォルダが最も多いもの＝共有の本命フォルダ**を選ぶ。
+    こうすると、アプリを主フォルダ／サブフォルダのどちらで動かしても、
+    いつも同じ共有フォルダ（業績予想アプリ\\決算短信PDF）に保存される。
+    どこにも無ければ自分の隣に新規作成する。"""
+    candidates = []
     for base in (BASE_DIR, BASE_DIR.parent, BASE_DIR.parent.parent):
         cand = base / "決算短信PDF"
         if cand.is_dir():
-            return cand
+            try:
+                n = sum(1 for d in cand.iterdir() if d.is_dir())
+            except Exception:
+                n = 0
+            candidates.append((n, cand))
+    if candidates:
+        # 銘柄フォルダ数が最も多い候補を採用（同数なら自分に近い方＝先頭）
+        candidates.sort(key=lambda t: t[0], reverse=True)
+        return candidates[0][1]
     return OUT_ROOT
 
 
