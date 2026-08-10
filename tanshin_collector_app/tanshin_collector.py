@@ -533,37 +533,40 @@ if st.button("📊 保存済みPDFを解析", disabled=not code):
 
 # 抽出結果の表示・編集・ダウンロード（再実行をまたいで保持）
 if st.session_state.get("extracted_rows") and st.session_state.get("extracted_code") == code:
-    st.markdown("**抽出結果（時系列は横。数値は直接編集できます。おかしい値は手で直してからDLしてください）**")
+    st.markdown("**抽出結果（時系列は横）。おかしい値はCSVをDLしてExcelで直せます。**")
     base_df = (pd.DataFrame(st.session_state["extracted_rows"])
                .sort_values(["期", "Q"]).reset_index(drop=True))
     base_df["時期"] = base_df["期"].astype(str) + "期 " + base_df["Q"].astype(str) + "Q"
 
+    # 数値列は必ず数値型にそろえる（Noneが混ざった表で表示が壊れるのを防ぐ）
+    metrics = ["売上高", "受注高", "受注残高", "B/Bレシオ"]
+    for m in metrics:
+        base_df[m] = pd.to_numeric(base_df[m], errors="coerce")
+
     # 欠損と、受注高マイナス（抽出ミスの疑い）をチェック
     n_miss = int(base_df[["売上高", "受注高", "受注残高"]].isna().any(axis=1).sum())
-    neg_labels = base_df.loc[
-        pd.to_numeric(base_df["受注高"], errors="coerce") < 0, "時期"].tolist()
+    neg_labels = base_df.loc[base_df["受注高"] < 0, "時期"].tolist()
 
     # 時系列を横に：列＝各期Q（左→右で新しく）、行＝指標
     order = base_df["時期"].tolist()
-    metrics = ["売上高", "受注高", "受注残高", "B/Bレシオ"]
     tdf = base_df.set_index("時期")[metrics].T[order]
 
-    edited = st.data_editor(tdf, use_container_width=True)
+    # 編集グリッドは空セルが多いと表示側でエラーになるため、頑丈な表示に統一
+    st.dataframe(tdf, use_container_width=True)
 
     if neg_labels:
         st.error("⚠️ 受注高がマイナスの期があります（" + " / ".join(neg_labels) + "）。"
-                 "抽出ミスの可能性が高いです。『AIで抽出する』をONにして解析し直すか、"
-                 "原本PDFを見て手で修正してください。")
+                 "抽出ミスの可能性が高いです。原本PDFを見て確認してください。")
     if n_miss:
-        st.warning(f"抽出できなかった項目が {n_miss} 期分あります。表を直接編集して補ってください"
-                   "（受注高・受注残高が無い会社もあります）。")
+        st.warning(f"数値が取れなかったマスが {n_miss} 期分あります"
+                   "（受注高・受注残高をそもそも開示していない会社もあります）。")
 
-    # 抽出元・備考は横持ちに混ぜず、参考として下に表示
-    with st.expander("抽出元・備考（各期の読み取り根拠）"):
+    # 抽出元・備考は横持ちに混ぜず、参考として下に表示（AIが使われたかもここで分かる）
+    with st.expander("抽出元・備考（各期の読み取り根拠。抽出元が ai_pdf ならPDF直読み）"):
         st.dataframe(base_df[["時期", "抽出元", "備考"]],
                      use_container_width=True, hide_index=True)
 
-    csv_bytes = edited.to_csv().encode("utf-8-sig")  # 先頭列に指標名(index)を残す・BOM付き
+    csv_bytes = tdf.to_csv().encode("utf-8-sig")  # 先頭列に指標名(index)を残す・BOM付き
     st.download_button(
         "📥 CSVをダウンロード（時系列・横）", csv_bytes,
         file_name=f"{code}_業績_売上受注受注残_時系列.csv", mime="text/csv",
