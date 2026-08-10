@@ -31,6 +31,12 @@ import database
 
 BASE_DIR = Path(__file__).parent
 OUT_ROOT = BASE_DIR / "決算短信PDF"
+
+# ★★ 保存先フォルダ（ここに入れる）★★
+# ここに書いたフォルダに、銘柄ごとの短信PDFを保存します。
+# フォルダを移動したときは、この1行だけ書き換えてください。
+# 空文字 "" にすると、自動判定（銘柄フォルダが一番多い決算短信PDF）に戻ります。
+FIXED_OUT_ROOT = r"C:\新高値ブレイク投資塾\重要フォルダ\上原@勉強会\上原さん流業績予想\業績予想アプリ\決算短信PDF"
 IRBANK = "https://irbank.net"
 HEADERS = {
     "User-Agent": (
@@ -59,11 +65,21 @@ def _safe_name(s: str) -> str:
 
 def _out_root() -> Path:
     """保存先の「決算短信PDF」フォルダを決める。
-    このファイルの場所→1つ上→2つ上 の中から既存の「決算短信PDF」を探し、
-    **既存の銘柄フォルダが最も多いもの＝共有の本命フォルダ**を選ぶ。
-    こうすると、アプリを主フォルダ／サブフォルダのどちらで動かしても、
-    いつも同じ共有フォルダ（業績予想アプリ\\決算短信PDF）に保存される。
-    どこにも無ければ自分の隣に新規作成する。"""
+    まず FIXED_OUT_ROOT（上で指定した固定フォルダ）を最優先で使う。
+    それが空、または見つからない場合だけ、自動判定
+    （このファイルの近くで銘柄フォルダが最も多い決算短信PDF）にする。"""
+    # 1) 明示指定の固定フォルダを最優先
+    if FIXED_OUT_ROOT:
+        p = Path(FIXED_OUT_ROOT)
+        try:
+            if p.is_dir():
+                return p
+            if p.parent.is_dir():       # 親フォルダがあれば作ってそこに入れる
+                p.mkdir(parents=True, exist_ok=True)
+                return p
+        except Exception:
+            pass
+    # 2) フォールバック：自動判定（銘柄フォルダが一番多い決算短信PDF）
     candidates = []
     for base in (BASE_DIR, BASE_DIR.parent, BASE_DIR.parent.parent):
         cand = base / "決算短信PDF"
