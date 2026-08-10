@@ -485,30 +485,55 @@ if st.button("📊 保存済みPDFを解析", disabled=not code):
         bar2.empty()
         st.session_state["extracted_rows"] = rows
         st.session_state["extracted_code"] = code
+        # AI（PDF直読み）が使われたか確認。使われていないと受注高がマイナス等になりやすい。
+        if use_ai and _get_api_key() is None:
+            st.error(
+                "『AIで抽出する』はONですが、APIキーが見つかりません。"
+                ".streamlit\\secrets.toml に api_key を設定してください。"
+                "今回は正規表現で抽出したため、受注高が不正確（マイナス等）になっている場合があります。"
+            )
+        elif not use_ai:
+            st.info(
+                "『AIで抽出する』がOFFです。受注高は正規表現抽出のため不正確になりやすい"
+                "（マイナス等）。精度を上げるにはONにして解析し直してください（Claude API使用）。"
+            )
 
 # 抽出結果の表示・編集・ダウンロード（再実行をまたいで保持）
 if st.session_state.get("extracted_rows") and st.session_state.get("extracted_code") == code:
-    st.markdown("**抽出結果（表は直接編集できます。おかしい値は手で直してからDLしてください）**")
-    df = pd.DataFrame(st.session_state["extracted_rows"])
-    edited = st.data_editor(
-        df, use_container_width=True, hide_index=True, num_rows="dynamic",
-        column_config={
-            "期": st.column_config.NumberColumn(format="%d"),
-            "Q": st.column_config.NumberColumn(format="%d"),
-            "売上高": st.column_config.NumberColumn(help="単独Q・百万円"),
-            "受注高": st.column_config.NumberColumn(help="単独Q・百万円"),
-            "受注残高": st.column_config.NumberColumn(help="期末・百万円"),
-            "B/Bレシオ": st.column_config.NumberColumn(format="%.2f"),
-        },
-    )
-    n_miss = int(edited[["売上高", "受注高", "受注残高"]].isna().any(axis=1).sum())
+    st.markdown("**抽出結果（時系列は横。数値は直接編集できます。おかしい値は手で直してからDLしてください）**")
+    base_df = (pd.DataFrame(st.session_state["extracted_rows"])
+               .sort_values(["期", "Q"]).reset_index(drop=True))
+    base_df["時期"] = base_df["期"].astype(str) + "期 " + base_df["Q"].astype(str) + "Q"
+
+    # 欠損と、受注高マイナス（抽出ミスの疑い）をチェック
+    n_miss = int(base_df[["売上高", "受注高", "受注残高"]].isna().any(axis=1).sum())
+    neg_labels = base_df.loc[
+        pd.to_numeric(base_df["受注高"], errors="coerce") < 0, "時期"].tolist()
+
+    # 時系列を横に：列＝各期Q（左→右で新しく）、行＝指標
+    order = base_df["時期"].tolist()
+    metrics = ["売上高", "受注高", "受注残高", "B/Bレシオ"]
+    tdf = base_df.set_index("時期")[metrics].T[order]
+
+    edited = st.data_editor(tdf, use_container_width=True)
+
+    if neg_labels:
+        st.error("⚠️ 受注高がマイナスの期があります（" + " / ".join(neg_labels) + "）。"
+                 "抽出ミスの可能性が高いです。『AIで抽出する』をONにして解析し直すか、"
+                 "原本PDFを見て手で修正してください。")
     if n_miss:
-        st.warning(f"抽出できなかった項目が **{n_miss} 行** あります。表を直接編集して補ってください"
+        st.warning(f"抽出できなかった項目が {n_miss} 期分あります。表を直接編集して補ってください"
                    "（受注高・受注残高が無い会社もあります）。")
-    csv_bytes = edited.to_csv(index=False).encode("utf-8-sig")  # Excelで文字化けしないBOM付き
+
+    # 抽出元・備考は横持ちに混ぜず、参考として下に表示
+    with st.expander("抽出元・備考（各期の読み取り根拠）"):
+        st.dataframe(base_df[["時期", "抽出元", "備考"]],
+                     use_container_width=True, hide_index=True)
+
+    csv_bytes = edited.to_csv().encode("utf-8-sig")  # 先頭列に指標名(index)を残す・BOM付き
     st.download_button(
-        "📥 CSVをダウンロード", csv_bytes,
-        file_name=f"{code}_業績_売上受注受注残.csv", mime="text/csv",
+        "📥 CSVをダウンロード（時系列・横）", csv_bytes,
+        file_name=f"{code}_業績_売上受注受注残_時系列.csv", mime="text/csv",
         type="primary",
     )
     st.caption("※ 単位は百万円。売上高・受注高は単独Q、受注残高は期末残高。B/Bレシオ＝受注高÷売上高。")
