@@ -1,0 +1,4 @@
+# 取得データのキャッシュと生成物はコミットしない
+data/*.csv
+output/*.png
+output/*.csv
