@@ -73,19 +73,23 @@ MARU, BATSU, DASH = "〇", "✖", "－"
 
 # V2（短縮名）と V1（旧名）の候補。最初に見つかった非空の値を使う。
 FIELDS = {
+    # --- /equities/master ---
     "code":     ["Code", "code", "LocalCode"],
     "sector33": ["S33Nm", "Sector33CodeName", "Sector33Name"],
     "market":   ["MktNm", "MarketCodeName", "MarketName", "MktCdNm"],
-    "date":     ["Date", "date", "DisclosedDate"],
+    # --- /equities/bars/daily（V2 実測: Date, C, L, AdjC, AdjL ...）---
+    "date":     ["Date", "DiscDate", "DisclosedDate"],
     "close":    ["AdjC", "C", "Close", "AdjustmentClose"],
     "low":      ["AdjL", "L", "Low", "AdjustmentLow"],
+    # --- /fins/summary（V2 実測: DiscDate, CurPerType, EPS, FEPS, NxFEPS, BPS, TA, NP,
+    #     DivAnn, FDivAnn, NxFDivAnn ...）---
     "bps":      ["BPS", "BookValuePerShare"],
-    "eps_fc":   ["FEPS", "ForecastEPS", "ForecastEarningsPerShare",
-                 "NextYearForecastEarningsPerShare"],
-    "eps":      ["EPS", "EarningsPerShare"],
-    "dps_fc":   ["FDPSA", "FDPS", "ForecastDividendPerShareAnnual",
-                 "NextYearForecastDividendPerShareAnnual"],
-    "dps":      ["DPSA", "DPS", "ResultDividendPerShareAnnual"],
+    "eps_fc":   ["FEPS", "NxFEPS", "ForecastEarningsPerShare",
+                 "NextYearForecastEarningsPerShare"],   # 通期の予想EPS（FY開示なら来期予想）
+    "eps":      ["EPS", "EarningsPerShare"],           # 実績EPS（通期開示のものを使う）
+    "dps_fc":   ["FDivAnn", "NxFDivAnn", "ForecastDividendPerShareAnnual",
+                 "NextYearForecastDividendPerShareAnnual"],  # 年間予想配当
+    "dps":      ["DivAnn", "ResultDividendPerShareAnnual"],  # 年間実績配当
     "np":       ["NP", "Profit", "NetProfit"],
     "ta":       ["TA", "TotalAssets"],
     "period":   ["CurPerType", "TypeOfCurrentPeriod", "PeriodType"],
@@ -200,9 +204,12 @@ class Mock:
         random.seed(code + "f")
         bps = random.uniform(300, 4000)
         eps = random.uniform(-50, 400)
-        return [{"Code": code, "DisclosedDate": "2026-05-10", "TypeOfCurrentPeriod": "FY",
-                 "BPS": bps, "EPS": eps, "FEPS": eps * 1.05,
-                 "FDPSA": max(0.0, eps * 0.3), "NP": eps * 1e6, "TA": bps * 2.5e6}]
+        return [{"Code": code, "DiscDate": "2026-05-10", "CurPerType": "FY",
+                 "BPS": bps, "EPS": eps, "NxFEPS": eps * 1.05,
+                 "NxFDivAnn": max(0.0, eps * 0.3), "NP": eps * 1e6, "TA": bps * 2.5e6},
+                {"Code": code, "DiscDate": "2026-08-05", "CurPerType": "1Q",
+                 "BPS": bps * 1.01, "EPS": eps / 4, "FEPS": eps * 1.05,
+                 "FDivAnn": max(0.0, eps * 0.3), "NP": eps * 2.5e5, "TA": bps * 2.5e6}]
 
 
 # =========================================================
@@ -223,6 +230,7 @@ def compute(code: str, prov, today: dt.date) -> dict:
     out = {"price": None, "low6m": None, "pbr": None, "per": None, "yield": None,
            "roa": None}
     bars = prov.bars(code, today - dt.timedelta(days=LOOKBACK_DAYS), today)
+    bars = sorted(bars, key=lambda b: str(first(b, "date") or ""))  # 古い→新しい
     closes = [fnum(first(b, "close")) for b in bars]
     lows = [fnum(first(b, "low")) for b in bars]
     closes = [c for c in closes if c]
@@ -234,13 +242,15 @@ def compute(code: str, prov, today: dt.date) -> dict:
     latest, fy = latest_fy(prov.summary(code))
     price = out["price"]
     if latest and price:
+        # 予想EPS・予想配当は直近開示のものを優先し、無ければ通期開示の実績を使う
+        # （四半期開示の EPS は四半期ぶんの値なので PER には使わない）
         bps = fnum(first(latest, "bps")) or (fy and fnum(first(fy, "bps")))
-        eps = fnum(first(latest, "eps_fc")) or (fy and fnum(first(fy, "eps_fc")))
-        if eps is None:
-            eps = fnum(first(latest, "eps"))
+        eps = fnum(first(latest, "eps_fc"))
+        if eps is None and fy:
+            eps = fnum(first(fy, "eps_fc")) or fnum(first(fy, "eps"))
         dps = fnum(first(latest, "dps_fc"))
-        if dps is None:
-            dps = fnum(first(latest, "dps"))
+        if dps is None and fy:
+            dps = fnum(first(fy, "dps_fc")) or fnum(first(fy, "dps"))
         if bps and bps > 0:
             out["pbr"] = price / bps
         if eps and eps > 0:
