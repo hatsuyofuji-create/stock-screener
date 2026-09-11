@@ -27,6 +27,9 @@
         python fill_table.py 銘柄一覧.xlsx -o 銘柄一覧_filled.xlsx
         python fill_table.py 銘柄一覧.xlsx --provider mock   # 鍵なしで動作確認（乱数）
    ※ .env を使わず、環境変数 JQUANTS_API_KEY を設定しても動く。
+   ※ レート制限(429)で途中で止まっても、出力ファイルを入力にして同じコマンドを
+      もう一度実行すれば、埋まっていない行だけ取り直す（続きから再開できる）。
+        python fill_table.py 銘柄一覧_filled.xlsx -o 銘柄一覧_filled.xlsx
 
  ※ V2 の項目名（短縮名）は環境により揺れがあるため、候補を FIELDS に並べてある。
    「フィールドが見つからない」というエラーが出たら、表示された実フィールド名を
@@ -62,7 +65,8 @@ YIELD_MIN = 3.0      # F列: 配当利回り(%) がこれ以上なら〇
 DOWNSIDE_MAX = 10.0  # C列: 直近半年安値までの下落余地(%) がこれ以内なら〇
 LOOKBACK_DAYS = 183  # C列で見る期間（暦日。約半年）
 FIRST_ROW = 5        # データの開始行
-SLEEP = 0.15         # API 呼び出し間隔（秒）
+SLEEP = 0.5          # API 呼び出し間隔（秒）
+RETRY_WAIT = [5, 15, 30, 60, 90, 120, 180, 300]  # 429(レート制限) 時の待ち秒数（順に長く）
 # ============================================================
 
 MARU, BATSU, DASH = "〇", "✖", "－"
@@ -123,10 +127,23 @@ class JQuants:
         self.s = requests.Session()
         self.s.headers["x-api-key"] = key
 
+    def _get_once(self, path: str, params: dict) -> requests.Response:
+        """1回 GET する。429(レート制限) は待って再試行する。"""
+        for i, wait in enumerate(RETRY_WAIT + [None]):
+            r = self.s.get(f"{self.base}{path}", params=params, timeout=30)
+            if r.status_code != 429 or wait is None:
+                return r
+            ra = r.headers.get("Retry-After")
+            if ra and ra.isdigit():
+                wait = max(wait, int(ra))
+            print(f"  レート制限にかかったので {wait} 秒待ちます（{i + 1}回目）", flush=True)
+            time.sleep(wait)
+        return r
+
     def get(self, path: str, params: dict) -> list[dict]:
         out, params = [], dict(params)
         while True:
-            r = self.s.get(f"{self.base}{path}", params=params, timeout=30)
+            r = self._get_once(path, params)
             if r.status_code >= 400:
                 raise RuntimeError(f"J-Quants {r.status_code} {path} {params}: {r.text[:300]}")
             body = r.json()
@@ -280,13 +297,18 @@ def main() -> None:
             cell._style = copy.copy(ws[f"{col}{ref_row}"]._style)
         cell.value = val
 
-    n_done = 0
+    n_done = n_skip = n_fail = 0
     for r in range(FIRST_ROW, ws.max_row + 1):
         code = ws.cell(r, 1).value
         if code is None:
             continue
         code5 = jq_code(code)
         put(r, "R", int(code5) if code5.isdigit() else code5)
+
+        # 埋める対象の列がすべて埋まっている行は通信しない（再実行時の続きから用）
+        if all(ws[f"{c}{r}"].value is not None for c in "CDEFJK"):
+            n_skip += 1
+            continue
 
         m = master.get(code5)
         if m:
@@ -298,7 +320,12 @@ def main() -> None:
         try:
             v = compute(code5, prov, today)
         except Exception as e:  # 1銘柄の失敗で全体を止めない
+            n_fail += 1
             print(f"  ! {code}: {e}", file=sys.stderr)
+            if n_fail >= 20:
+                print("  失敗が続くので中断します。ここまでの結果は保存します。"
+                      " しばらく待ってから同じコマンドをもう一度実行すると続きから埋まります。")
+                break
             continue
 
         if v["pbr"] is not None:
@@ -325,7 +352,10 @@ def main() -> None:
 
     wb.calculation.fullCalcOnLoad = True
     wb.save(out_path)
-    print(f"完了。{n_done} 銘柄を処理し {out_path} に保存しました。")
+    print(f"完了。取得 {n_done} 銘柄 / 埋まっていたので省略 {n_skip} 銘柄 / 失敗 {n_fail} 銘柄"
+          f" → {out_path} に保存しました。")
+    if n_fail:
+        print("失敗した銘柄は空欄のままです。同じコマンドをもう一度実行すると、そこだけ取り直します。")
 
 
 def rerank(ws) -> None:
