@@ -19,9 +19,14 @@
    H 詳細業種、I ROIC（有利子負債が summary に無い）、L ROIC順、P 受注開示
 
  使い方:
-   export JQUANTS_API_KEY=xxxx           # J-Quants V2 の APIキー
-   python fill_table.py 銘柄一覧.xlsx -o 銘柄一覧_filled.xlsx
-   python fill_table.py 銘柄一覧.xlsx --provider mock   # 鍵なしで動作確認（乱数）
+   1. このファイルと同じフォルダに .env というファイルを作り、1行書く:
+        JQUANTS_API_KEY=ここにAPIキー
+      （.env.example をコピーして書き換えればOK。.env は git に入らない）
+   2. 実行:
+        pip install openpyxl requests python-dotenv
+        python fill_table.py 銘柄一覧.xlsx -o 銘柄一覧_filled.xlsx
+        python fill_table.py 銘柄一覧.xlsx --provider mock   # 鍵なしで動作確認（乱数）
+   ※ .env を使わず、環境変数 JQUANTS_API_KEY を設定しても動く。
 
  ※ V2 の項目名（短縮名）は環境により揺れがあるため、候補を FIELDS に並べてある。
    「フィールドが見つからない」というエラーが出たら、表示された実フィールド名を
@@ -41,6 +46,14 @@ import time
 
 import requests
 from openpyxl import load_workbook
+
+# .env（このファイルと同じフォルダ）があれば読み込む。python-dotenv が無くても動く。
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except ImportError:
+    pass
 
 # ============== 【設定】ここの数字だけ変えればOK ==============
 PBR_MAX = 3.0        # D列: PBR がこれ以下なら〇
