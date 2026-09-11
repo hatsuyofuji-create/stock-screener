@@ -268,7 +268,7 @@ def flag(value, ok) -> str:
 # =========================================================
 def main() -> None:
     ap = argparse.ArgumentParser(description="銘柄一覧表の空欄を J-Quants で埋める")
-    ap.add_argument("xlsx")
+    ap.add_argument("xlsx", nargs="?", help="入力の Excel ファイル（--show-fields のときは不要）")
     ap.add_argument("-o", "--output", help="出力ファイル（省略時は *_filled.xlsx）")
     ap.add_argument("--provider", choices=["jquants", "mock"], default="jquants")
     ap.add_argument("--rerank", action="store_true",
@@ -281,6 +281,8 @@ def main() -> None:
     if args.show_fields:
         show_fields(args.show_fields)
         return
+    if not args.xlsx:
+        ap.error("入力の Excel ファイルを指定してください")
 
     out_path = args.output or args.xlsx.rsplit(".", 1)[0] + "_filled.xlsx"
     prov = Mock() if args.provider == "mock" else JQuants()
