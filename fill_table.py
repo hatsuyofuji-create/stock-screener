@@ -274,7 +274,13 @@ def main() -> None:
     ap.add_argument("--rerank", action="store_true",
                     help="M列(PBR順)・N列(ROA順)・O列(合成)を、値のある全行で再計算する")
     ap.add_argument("--limit", type=int, default=0, help="先頭 N 銘柄だけ処理（動作確認用）")
+    ap.add_argument("--show-fields", metavar="CODE",
+                    help="指定コード(例: 6307)の API 応答の項目名と値を表示して終了（項目名の確認用）")
     args = ap.parse_args()
+
+    if args.show_fields:
+        show_fields(args.show_fields)
+        return
 
     out_path = args.output or args.xlsx.rsplit(".", 1)[0] + "_filled.xlsx"
     prov = Mock() if args.provider == "mock" else JQuants()
@@ -356,6 +362,21 @@ def main() -> None:
           f" → {out_path} に保存しました。")
     if n_fail:
         print("失敗した銘柄は空欄のままです。同じコマンドをもう一度実行すると、そこだけ取り直します。")
+
+
+def show_fields(code) -> None:
+    """/fins/summary と /equities/bars/daily の実際の項目名を表示する（FIELDS 調整用）。"""
+    prov = JQuants()
+    code5 = jq_code(code)
+    today = dt.date.today()
+    print(f"=== /equities/bars/daily {code5}（直近1件） ===")
+    bars = prov.bars(code5, today - dt.timedelta(days=14), today)
+    for k, v in (bars[-1] if bars else {}).items():
+        print(f"  {k} = {v}")
+    print(f"=== /fins/summary {code5}（直近1件） ===")
+    latest, _ = latest_fy(prov.summary(code5))
+    for k, v in (latest or {}).items():
+        print(f"  {k} = {v}")
 
 
 def rerank(ws) -> None:
