@@ -86,7 +86,8 @@ class JQuantsProvider(PriceProvider):
         if p.exists() and (time.time() - p.stat().st_mtime) < _CACHE_TTL_SEC:
             return json.loads(p.read_text(encoding="utf-8"))
         rows = fetch()
-        p.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+        if rows:  # 取得失敗（空）はキャッシュしない。次回また取りに行く
+            p.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
         return rows
 
     # ---------------------------------------------------------------- 日足
@@ -125,11 +126,20 @@ class JQuantsProvider(PriceProvider):
 
     # ---------------------------------------------------------------- 決算
     def get_statements(self, code: str) -> pd.DataFrame:
+        """決算情報。V2 は /fins/summary（DiscDate, DiscTime, DocType, CurPerType, Sales, OP, NP, EPS, FOP, FNP …）。"""
         code = normalize_code(code)
-        rows = self._cached(
-            f"statements_{code}",
-            lambda: self._get_paginated("/fins/statements", {"code": code}, keys=("data", "statements")),
-        )
+
+        def fetch():
+            errors = []
+            for path in ("/fins/summary", "/fins/statements"):
+                try:
+                    return self._get_paginated(path, {"code": code}, keys=("data", "statements"))
+                except Exception as e:  # noqa: BLE001
+                    errors.append(str(e)[:160])
+            print(f"[jquants] 決算情報を取得できませんでした（決算照合なしで続行）: {errors}")
+            return []
+
+        rows = self._cached(f"statements_{code}", fetch)
         recs = []
         for row in rows:
             d = _first(row, "DisclosedDate", "DiscDate", "Date", "D")
@@ -139,13 +149,13 @@ class JQuantsProvider(PriceProvider):
                 "disclosed_date": pd.Timestamp(d),
                 "disclosed_time": _first(row, "DisclosedTime", "DiscTime", "Time") or "",
                 "doc_type": _first(row, "TypeOfDocument", "DocType", "TypeOfDoc") or "",
-                "period": _first(row, "TypeOfCurrentPeriod", "CurPeriodType", "PeriodType") or "",
-                "net_sales": _first(row, "NetSales", "Sales", "NS"),
-                "operating_profit": _first(row, "OperatingProfit", "OP", "OpProfit"),
-                "profit": _first(row, "Profit", "NP", "NetProfit"),
-                "eps": _first(row, "EarningsPerShare", "EPS"),
-                "forecast_operating_profit": _first(row, "ForecastOperatingProfit", "FcstOP", "FOP"),
-                "forecast_profit": _first(row, "ForecastProfit", "FcstNP", "FNP"),
+                "period": _first(row, "CurPerType", "TypeOfCurrentPeriod", "CurPeriodType", "PeriodType") or "",
+                "net_sales": _first(row, "Sales", "NetSales", "NS"),
+                "operating_profit": _first(row, "OP", "OperatingProfit", "OpProfit"),
+                "profit": _first(row, "NP", "Profit", "NetProfit"),
+                "eps": _first(row, "EPS", "EarningsPerShare"),
+                "forecast_operating_profit": _first(row, "FOP", "ForecastOperatingProfit", "FcstOP"),
+                "forecast_profit": _first(row, "FNP", "ForecastProfit", "FcstNP"),
             })
         cols = ["disclosed_date", "disclosed_time", "doc_type", "period", "net_sales",
                 "operating_profit", "profit", "eps", "forecast_operating_profit", "forecast_profit"]
@@ -163,18 +173,19 @@ class JQuantsProvider(PriceProvider):
         frm, to = start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
 
         def fetch():
-            errors = []
             for path, params in (
+                ("/indices/bars/daily/topix", {"from": frm, "to": to}),
                 ("/indices/bars/daily", {"code": "0000", "from": frm, "to": to}),
-                ("/indices/topix", {"from": frm, "to": to}),
             ):
                 try:
                     rows = self._get_paginated(path, params, keys=("data", "topix", "indices"))
                     if rows:
                         return rows
                 except Exception as e:  # noqa: BLE001
-                    errors.append(str(e)[:120])
-            print(f"[jquants] TOPIX を取得できませんでした（地合い判定なしで続行）: {errors}")
+                    msg = str(e)
+                    if "subscription" in msg or "403" in msg:
+                        break  # プランで使えない（Light）。yfinance に切り替える
+            print("[jquants] TOPIX は Light プランでは取得できないため、TOPIX連動ETF(1306.T)で代用します")
             return []
 
         rows = self._cached(f"topix_{frm}_{to}", fetch)
@@ -184,7 +195,9 @@ class JQuantsProvider(PriceProvider):
             c = _first(row, "C", "Close", "AdjC")
             if d is not None and c is not None:
                 vals[pd.Timestamp(d)] = float(c)
-        return pd.Series(vals, dtype="float64").sort_index()
+        if vals:
+            return pd.Series(vals, dtype="float64").sort_index()
+        return market_index_fallback(start, end)
 
     # ------------------------------------------------------------- 銘柄名
     def get_company_name(self, code: str) -> str:
@@ -202,3 +215,20 @@ class JQuantsProvider(PriceProvider):
             if n:
                 return str(n)
         return code
+
+
+def market_index_fallback(start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
+    """J-Quants で指数が取れないとき（Light）の代用: yfinance の TOPIX連動ETF（1306.T）終値。
+    失敗しても空の Series を返して本体は続行する。"""
+    try:
+        import yfinance as yf
+
+        hist = yf.Ticker("1306.T").history(start=start.strftime("%Y-%m-%d"),
+                                           end=(end + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+                                           interval="1d", auto_adjust=True)
+        close = hist["Close"].dropna()
+        close.index = pd.DatetimeIndex(close.index).tz_localize(None).normalize()
+        return close.astype("float64").sort_index()
+    except Exception as e:  # noqa: BLE001
+        print(f"[jquants] 代用の指数(1306.T)も取得できませんでした（地合い判定なしで続行）: {type(e).__name__}: {str(e)[:100]}")
+        return pd.Series(dtype="float64")

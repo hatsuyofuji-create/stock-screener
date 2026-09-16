@@ -6,4 +6,5 @@ python-dotenv>=1.0
 beautifulsoup4>=4.12
 streamlit>=1.30
 altair>=5.0
+yfinance>=0.2.40   # Light プランで TOPIX が取れないときの代用（1306.T）
 pytest>=8.0   # テスト用（任意）

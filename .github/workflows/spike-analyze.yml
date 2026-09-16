@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install pandas numpy requests python-dotenv beautifulsoup4
+        run: pip install pandas numpy requests python-dotenv beautifulsoup4 yfinance
       - name: TDnet crawl check
         if: ${{ inputs.tdnet_days != '0' }}
         run: python update_daily.py --days ${{ inputs.tdnet_days }}

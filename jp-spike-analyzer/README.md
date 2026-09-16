@@ -41,7 +41,7 @@ cp .env.example .env
 
 - ダッシュボードで **APIキー** を発行し `JQUANTS_API_KEY` に入れる（`x-api-key` ヘッダで送られます）
 - Light は日足が過去5年ぶん。既定で5年遡る（`--years` で短縮可）
-- 33業種指数は Standard 以上なので、地合いの判定は **TOPIX のみ**。TOPIX が取れない場合も本体は続行します
+- 指数データ（TOPIX を含む）は Standard 以上。Light では **TOPIX連動ETF（1306.T）を yfinance で代用**して地合いを判定します
 - 取得結果は `db/cache/jquants/` に1日キャッシュされます
 
 ### EDINET API（金融庁・無料）
@@ -97,7 +97,7 @@ streamlit run app.py
 |---|---|---|
 | 前日比・寄付ギャップ・出来高倍率・5日後/20日後 | J-Quants 日足 | 当日 |
 | TOPIX 同日騰落・対TOPIX 超過（+2% 以上なら「地合い」） | J-Quants | 当日 |
-| 決算発表 | J-Quants `/fins/statements` | 前日〜当日 |
+| 決算発表 | J-Quants `/fins/summary` | 前日〜当日 |
 | 適時開示（種別タグ付き） | TDnet 蓄積 + バックフィル | 前日〜翌日 |
 | EDINET 提出書類 | EDINET API | 前日〜5営業日後 |
 | ニュース見出し | Google News RSS | 2営業日前〜翌日 |

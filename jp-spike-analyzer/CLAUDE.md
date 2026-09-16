@@ -50,7 +50,7 @@ jp-spike-analyzer/
   EDINET は `EdinetClient`、ニュースは `news.fetch_news` 経由。
 - `PROVIDER=mock` のときは開示・EDINET・ニュースも全部モックにして、鍵なしで一通り動くようにする。
 - 外部ソースが落ちても本体は続行する（TOPIX / EDINET / ニュースは空で返す）。
-- J-Quants は **Light** 前提（日足5年、TOPIX のみ、業種指数なし）。フィールド名は V2 短縮名を第一候補に
+- J-Quants は **Light** 前提（日足5年、決算 `/fins/summary`）。指数は Light で取れないので TOPIX連動ETF 1306.T を yfinance で代用。フィールド名は V2 短縮名を第一候補に
   V1 名へフォールバック（`_first()`）。特定できないときは実フィールド名を例外に出す。
 - 適時開示は **公式 TDnet を日次で貯める**のが主。非公式 API はバックフィル専用で、止まっても日次に影響しない。
 - 秘密情報はコード直書き禁止。`.env`（`.gitignore` 済み）と GitHub Secrets のみ。
@@ -66,9 +66,9 @@ jp-spike-analyzer/
 
 ## 未検証・TODO
 
-- このコードは J-Quants / TDnet / EDINET / Google News の**実応答で未検証**（開発環境から外部に出られなかった）。
-  初回は `PROVIDER=jquants python analyze.py 7203 --years 1` で通し、例外メッセージ中の実フィールド名を見て
-  `_first()` の候補を直す。
+- J-Quants は日足（/equities/bars/daily）と銘柄名（/equities/master）を実データで確認済み。
+  /fins/summary・TDnet・EDINET・Google News・yfinance(1306.T) は実応答で未確認。エラー時は例外メッセージ中の
+  実フィールド名を見て `_first()` の候補を直す。
 - TDnet 一覧 HTML の td クラス名（kjTime / kjCode / kjName / kjTitle）が変わったら `tdnet.parse_list_page` を直す。
 - 祝日判定は未実装（土日のみ除外。休場日は TDnet が空を返すので実害なし）。
 - 銘柄コードが英字入り（例: 130A）の場合の J-Quants 側の扱いは未確認。
