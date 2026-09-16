@@ -65,10 +65,13 @@ def _rel_label(trading_days: pd.DatetimeIndex, day: pd.Timestamp, other: pd.Time
 
 
 def _market_tag(pct: float, topix_pct: float | None) -> tuple[str | None, float | None]:
+    """急騰なら TOPIX +2% 以上、急落なら -2% 以下のとき「地合い」。"""
     if topix_pct is None or pd.isna(topix_pct):
         return None, None
     rel = pct - topix_pct
-    if topix_pct >= MARKET_MOVE_PCT:
+    if pct >= 0 and topix_pct >= MARKET_MOVE_PCT:
+        return f"地合い(TOPIX{topix_pct:+.1f}%)", rel
+    if pct < 0 and topix_pct <= -MARKET_MOVE_PCT:
         return f"地合い(TOPIX{topix_pct:+.1f}%)", rel
     return None, rel
 
@@ -102,6 +105,7 @@ def enrich(
             "vol_ratio": None if pd.isna(s.get("vol_ratio")) else round(float(s["vol_ratio"]), 2),
             "fwd_5": None if pd.isna(s.get("fwd_5")) else round(float(s["fwd_5"]), 2),
             "fwd_20": None if pd.isna(s.get("fwd_20")) else round(float(s["fwd_20"]), 2),
+            "direction": str(s.get("direction") or ("up" if float(s["pct"]) >= 0 else "down")),
             "rule": s.get("reason", ""),
         }
         tags: list[str] = []

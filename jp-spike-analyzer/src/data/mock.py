@@ -21,6 +21,7 @@ _SPIKE_PLAN = [
     {"back": 150, "pct": 0.09, "kind": "自己株"},
     {"back": 60, "pct": 0.15, "kind": "TOB"},
     {"back": 12, "pct": 0.085, "kind": "地合い"},
+    {"back": 200, "pct": -0.11, "kind": "下方修正"},
 ]
 
 
@@ -120,6 +121,15 @@ class MockProvider(PriceProvider):
                     "forecast_sales": 4.6e11, "forecast_operating_profit": 3.7e10, "forecast_profit": 2.6e10,
                     "next_fy_forecast_sales": None, "next_fy_forecast_operating_profit": None, "next_fy_forecast_profit": None,
                 })
+            if plan["kind"] == "下方修正":
+                fy_end = pd.Timestamp(year=d.year + (1 if d.month >= 4 else 0), month=3, day=31)
+                recs.append({
+                    "disclosed_date": d, "disclosed_time": "15:30:00",
+                    "doc_type": "EarnForecastRevision", "period": "", "fy_end": fy_end,
+                    "net_sales": None, "operating_profit": None, "ordinary_profit": None, "profit": None, "eps": None,
+                    "forecast_sales": 3.6e11, "forecast_operating_profit": 2.4e10, "forecast_profit": 0.9e10,
+                    "next_fy_forecast_sales": None, "next_fy_forecast_operating_profit": None, "next_fy_forecast_profit": None,
+                })
             if plan["kind"] == "業績修正":
                 fy_end = pd.Timestamp(year=d.year + (1 if d.month >= 4 else 0), month=3, day=31)
                 recs.append({
@@ -152,6 +162,7 @@ def mock_disclosures(code: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.Da
         "業績修正": "業績予想の修正（上方修正）に関するお知らせ",
         "自己株": "自己株式の取得及び自己株式立会外買付取引（ToSTNeT-3）による自己株式の買付けに関するお知らせ",
         "TOB": "株式会社◯◯による当社株式に対する公開買付けの開始及び賛同の意見表明に関するお知らせ",
+        "下方修正": "業績予想の修正（下方修正）及び特別損失の計上に関するお知らせ",
     }
     rows = []
     for plan in _SPIKE_PLAN:
@@ -189,6 +200,7 @@ def mock_news(name: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame
         "自己株": f"{name}、自己株買いを発表　発行済みの3%",
         "TOB": f"{name}にTOB　プレミアム40%で全株取得へ",
         "地合い": "日経平均が急反発、半導体株が主導",
+        "下方修正": f"{name}が通期予想を下方修正　減損で特損計上、株価は急落",
     }
     for plan in _SPIKE_PLAN:
         d = p.dates[p.days - plan["back"]]

@@ -40,16 +40,26 @@ def add_features(bars: pd.DataFrame, cfg: SpikeConfig) -> pd.DataFrame:
 def detect_spikes(bars: pd.DataFrame, cfg: SpikeConfig | None = None) -> pd.DataFrame:
     """急騰日を抽出する。
 
-    判定: 前日終値 → 当日終値（翌営業日終値）の変化率 pct が cfg.pct % 以上。
+    判定: 前日終値 → 当日終値（翌営業日終値）の変化率 pct が
+      急騰: cfg.pct % 以上 / 急落: -cfg.drop_pct % 以下（cfg.direction で up / down / both）。
     出来高倍率・寄付ギャップは表示用に併記するだけで、判定には使わない。
     """
     cfg = cfg or SpikeConfig()
     if bars is None or bars.empty or "close" not in bars:
-        return pd.DataFrame(columns=["date", "close", "pct", "gap_pct", "high_pct", "vol_ratio", "reason"])
+        return pd.DataFrame(columns=["date", "close", "pct", "gap_pct", "high_pct", "vol_ratio", "direction", "reason"])
     df = add_features(bars, cfg)
-    hit = df[df["pct"] >= cfg.pct].copy()
-    hit["reason"] = f"前日終値比{cfg.pct:g}%以上"
-    cols = ["close", "pct", "gap_pct", "high_pct", "vol_ratio", "reason"] + [f"fwd_{n}" for n in cfg.forward_days]
+    up = df["pct"] >= cfg.pct
+    down = df["pct"] <= -cfg.drop_pct
+    if cfg.direction == "up":
+        mask = up
+    elif cfg.direction == "down":
+        mask = down
+    else:
+        mask = up | down
+    hit = df[mask].copy()
+    hit["direction"] = np.where(hit["pct"] >= 0, "up", "down")
+    hit["reason"] = np.where(hit["pct"] >= 0, f"前日終値比+{cfg.pct:g}%以上", f"前日終値比-{cfg.drop_pct:g}%以下")
+    cols = ["close", "pct", "gap_pct", "high_pct", "vol_ratio", "direction", "reason"] + [f"fwd_{n}" for n in cfg.forward_days]
     out = hit[cols].reset_index().rename(columns={"index": "date"})
     if "date" not in out.columns:  # index 名が date だった場合
         out = out.rename(columns={bars.index.name or "index": "date"})

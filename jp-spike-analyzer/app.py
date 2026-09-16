@@ -38,7 +38,10 @@ with st.sidebar:
     code = st.text_input("銘柄コード", value="7203", max_chars=5)
     env_cfg = SpikeConfig.from_env()
     years = st.slider("遡る年数", min_value=1.0, max_value=5.0, value=float(min(env_cfg.years, 5.0)), step=0.5)
+    direction_label = st.radio("対象", ["急騰", "急落", "両方"], horizontal=True)
+    direction = {"急騰": "up", "急落": "down", "両方": "both"}[direction_label]
     pct = st.number_input("急騰: 前日終値比（%）以上", value=float(env_cfg.pct), step=0.5)
+    drop_pct = st.number_input("急落: 前日終値比（%）以下", value=float(env_cfg.drop_pct), step=0.5)
     with_news = st.checkbox("ニュース見出しを取得（Google News）", value=True)
     with_edinet = st.checkbox("EDINET を照合", value=True)
     run = st.button("分析する", type="primary")
@@ -57,8 +60,8 @@ with st.sidebar:
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def _run(code: str, years: float, pct: float, with_news: bool, with_edinet: bool):
-    cfg = SpikeConfig(pct=pct)
+def _run(code: str, years: float, pct: float, drop_pct: float, direction: str, with_news: bool, with_edinet: bool):
+    cfg = SpikeConfig(pct=pct, drop_pct=drop_pct, direction=direction)
     logs: list[str] = []
     res = pipeline.analyze(code, years, cfg=cfg, with_news=with_news, with_edinet=with_edinet, log=logs.append)
     bars = res.pop("_bars")
@@ -73,7 +76,7 @@ if run:
     else:
         with st.spinner("取得・分析中…（初回は J-Quants / ニュース取得に時間がかかります）"):
             try:
-                st.session_state["result"] = _run(code.strip(), years, pct, with_news, with_edinet)
+                st.session_state["result"] = _run(code.strip(), years, pct, drop_pct, direction, with_news, with_edinet)
             except Exception as e:  # noqa: BLE001
                 st.session_state["result"] = None
                 st.error(f"分析に失敗しました: {e}")
@@ -89,7 +92,8 @@ spikes = res["spikes"]
 st.subheader(f"{res['name']}（{res['code']}）  {res['start']} 〜 {res['end']}")
 c = st.columns(4)
 c[0].metric("営業日数", f"{res['n_days']:,}")
-c[1].metric("急騰日", f"{len(spikes)} 件")
+n_up = sum(1 for s in spikes if s["direction"] == "up")
+c[1].metric("急騰日 / 急落日", f"{n_up} 件 / {len(spikes) - n_up} 件")
 tagged = sum(1 for s in spikes if "材料不明" not in s["tags"])
 c[2].metric("要因が特定できた日", f"{tagged} 件")
 c[3].metric("材料不明", f"{sum(1 for s in spikes if '材料不明' in s['tags'])} 件")
@@ -103,9 +107,12 @@ base = alt.Chart(chart_df).mark_line(color="#4C78A8").encode(
 )
 if spikes:
     sp_df = pd.DataFrame([{"date": pd.Timestamp(s["date"]), "close": s["close"], "pct": s["pct"],
+                           "種別": "急騰" if s["direction"] == "up" else "急落",
                            "tags": " / ".join(s["tags"])} for s in spikes])
-    pts = alt.Chart(sp_df).mark_point(color="#E45756", size=90, filled=True).encode(
+    pts = alt.Chart(sp_df).mark_point(size=90, filled=True).encode(
         x="date:T", y="close:Q",
+        color=alt.Color("種別:N", scale=alt.Scale(domain=["急騰", "急落"], range=["#E45756", "#3B7DD8"]), legend=alt.Legend(title="")),
+        shape=alt.Shape("種別:N", scale=alt.Scale(domain=["急騰", "急落"], range=["triangle-up", "triangle-down"]), legend=None),
         tooltip=[alt.Tooltip("date:T", title="日付"), alt.Tooltip("pct:Q", title="前日比%", format="+.1f"),
                  alt.Tooltip("tags:N", title="要因")],
     )
@@ -114,7 +121,7 @@ else:
     st.altair_chart(base.properties(height=320), use_container_width=True)
 
 if not spikes:
-    st.warning("条件に合う急騰日がありませんでした。しきい値を下げてみてください。")
+    st.warning("条件に合う急騰・急落日がありませんでした。しきい値を下げてみてください。")
     st.stop()
 
 # ---------------------------------------------------------------- 一覧
@@ -123,18 +130,20 @@ def _p(v):
 
 
 table = pd.DataFrame([{
+    "種別": "▲急騰" if s["direction"] == "up" else "▼急落",
     "日付": s["date"], "前日比": _p(s["pct"]), "寄付ギャップ": _p(s["gap_pct"]),
     "出来高倍率": "—" if s["vol_ratio"] is None else f"{s['vol_ratio']:.1f}倍",
     "TOPIX": _p(s["topix_pct"]), "5日後": _p(s["fwd_5"]), "20日後": _p(s["fwd_20"]),
     "要因タグ": " / ".join(s["tags"]),
 } for s in spikes])
-st.subheader("急騰日一覧")
+st.subheader("急騰・急落日一覧")
 st.dataframe(table, use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------- 詳細
-st.subheader("急騰日ごとの詳細")
+st.subheader("日ごとの詳細")
 for s in spikes:
-    head = f"{s['date']}  {_p(s['pct'])}   〔{' / '.join(s['tags'])}〕"
+    mark = "▲" if s["direction"] == "up" else "▼"
+    head = f"{mark} {s['date']}  {_p(s['pct'])}   〔{' / '.join(s['tags'])}〕"
     with st.expander(head, expanded=False):
         m = st.columns(5)
         m[0].metric("前日比", _p(s["pct"]))

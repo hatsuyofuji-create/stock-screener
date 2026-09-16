@@ -5,6 +5,8 @@ analyze.py — 銘柄コードを指定して急騰日と「その時何が起�
 使い方:
   python analyze.py 7203                 # mock（鍵不要）
   PROVIDER=jquants python analyze.py 7203 --years 5
+  python analyze.py 7203 --down          # 急落日（-8% 以下）を分析
+  python analyze.py 7203 --both          # 急騰・急落の両方
   python analyze.py 7203 --no-news       # ニュース取得を省く
 結果は画面に表示し、db/analysis/<code>.json にも保存する（app.py でも読める）。
 """
@@ -32,10 +34,13 @@ def _fmt(v, suffix="%"):
 
 
 def print_report(res: dict) -> None:
-    print(f"\n=== {res['name']}（{res['code']}） {res['start']}〜{res['end']} / 急騰 {len(res['spikes'])} 件 ===")
+    n_up = sum(1 for e in res["spikes"] if e["direction"] == "up")
+    n_down = len(res["spikes"]) - n_up
+    print(f"\n=== {res['name']}（{res['code']}） {res['start']}〜{res['end']} / 急騰 {n_up} 件・急落 {n_down} 件 ===")
     for ev in res["spikes"]:
         vol = "—" if ev["vol_ratio"] is None else f"{ev['vol_ratio']:.1f}倍"
-        print(f"\n■ {ev['date']}  前日比 {ev['pct']:+.1f}%  寄付 {_fmt(ev['gap_pct'])}  出来高 {vol}  "
+        mark = "▲急騰" if ev["direction"] == "up" else "▼急落"
+        print(f"\n■ {mark} {ev['date']}  前日比 {ev['pct']:+.1f}%  寄付 {_fmt(ev['gap_pct'])}  出来高 {vol}  "
               f"TOPIX {_fmt(ev['topix_pct'])}  5日後 {_fmt(ev['fwd_5'])}  20日後 {_fmt(ev['fwd_20'])}")
         print(f"   要因タグ: {' / '.join(ev['tags']) or '—'}")
         for s in ev["statements"]:
@@ -61,11 +66,19 @@ def main() -> int:
     ap.add_argument("--no-news", action="store_true", help="ニュース取得を省く")
     ap.add_argument("--no-edinet", action="store_true", help="EDINET 照合を省く")
     ap.add_argument("--pct", type=float, help="急騰のしきい値（前日終値比 %%・既定 8）")
+    ap.add_argument("--drop-pct", type=float, help="急落のしきい値（前日終値比 %%・既定 8）")
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--down", action="store_true", help="急落日を分析する")
+    g.add_argument("--both", action="store_true", help="急騰日と急落日の両方を分析する")
     args = ap.parse_args()
 
     cfg = SpikeConfig.from_env()
-    if args.pct is not None:
-        cfg = SpikeConfig(pct=args.pct, years=cfg.years)
+    cfg = SpikeConfig(
+        pct=cfg.pct if args.pct is None else args.pct,
+        drop_pct=cfg.drop_pct if args.drop_pct is None else args.drop_pct,
+        direction="down" if args.down else ("both" if args.both else "up"),
+        years=cfg.years,
+    )
 
     res = pipeline.analyze(args.code, args.years, cfg=cfg, with_news=not args.no_news,
                            with_edinet=not args.no_edinet, name=args.name)

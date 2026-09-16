@@ -81,7 +81,12 @@ def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = 
     log(f"日足 {len(bars)} 営業日 / 銘柄名: {company}")
 
     spikes = spikes_mod.detect_spikes(bars, cfg)
-    log(f"急騰日: {len(spikes)} 件（前日終値比 {cfg.pct:g}% 以上）")
+    n_up = int((spikes["direction"] == "up").sum()) if len(spikes) else 0
+    n_down = int((spikes["direction"] == "down").sum()) if len(spikes) else 0
+    what = {"up": f"急騰日: {n_up} 件（前日終値比 +{cfg.pct:g}% 以上）",
+            "down": f"急落日: {n_down} 件（前日終値比 -{cfg.drop_pct:g}% 以下）"}.get(
+        cfg.direction, f"急騰日 {n_up} 件（+{cfg.pct:g}% 以上）/ 急落日 {n_down} 件（-{cfg.drop_pct:g}% 以下）")
+    log(what)
 
     topix = provider.get_market_index(start, end)
     statements = provider.get_statements(code)
@@ -129,7 +134,7 @@ def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = 
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "start": start.strftime("%Y-%m-%d"),
         "end": end.strftime("%Y-%m-%d"),
-        "config": {"pct": cfg.pct, "years": years},
+        "config": {"pct": cfg.pct, "drop_pct": cfg.drop_pct, "direction": cfg.direction, "years": years},
         "n_days": int(len(bars)),
         "spikes": events,
         "_bars": bars,  # 画面のチャート用（JSON には書かない）

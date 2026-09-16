@@ -25,6 +25,10 @@ class SpikeConfig:
 
     # 急騰の定義: 前日終値 → 翌営業日終値 の変化率（%）がこれ以上
     pct: float = 8.0
+    # 急落の定義: 変化率（%）が -drop_pct 以下
+    drop_pct: float = 8.0
+    # 検出する方向: "up"（急騰） / "down"（急落） / "both"
+    direction: str = "up"
     # 出来高倍率（表示用）の分母: 直近N日平均（当日は含めない）
     vol_window: int = 20
     # 遡る年数の初期値（チャートの見やすさ優先。J-Quants Light は最大5年）
@@ -36,6 +40,7 @@ class SpikeConfig:
     def from_env(cls) -> "SpikeConfig":
         return cls(
             pct=_env_float("SPIKE_PCT", cls.pct),
+            drop_pct=_env_float("DROP_PCT", cls.drop_pct),
             years=_env_float("SPIKE_YEARS", cls.years),
         )
 
@@ -46,5 +51,5 @@ EDINET_WINDOW = (-1, 5)     # EDINET: 大量保有報告書などは事後に出
 NEWS_WINDOW = (-2, 1)       # ニュース見出し
 STATEMENT_WINDOW = (-1, 0)  # 決算発表（J-Quants）: 前日引け後 or 当日
 
-# 「地合い」と判定する TOPIX の同日騰落（%）
+# 「地合い」と判定する TOPIX の同日騰落（%）。急騰は +2% 以上、急落は -2% 以下
 MARKET_MOVE_PCT = 2.0
