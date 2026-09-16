@@ -4,7 +4,7 @@ analyze.py — 銘柄コードを指定して急騰日と「その時何が起�
 
 使い方:
   python analyze.py 7203                 # mock（鍵不要）
-  PROVIDER=jquants python analyze.py 7203 --years 3
+  PROVIDER=jquants python analyze.py 7203 --years 5
   python analyze.py 7203 --no-news       # ニュース取得を省く
 結果は画面に表示し、db/analysis/<code>.json にも保存する（app.py でも読める）。
 """
@@ -52,16 +52,16 @@ def main() -> int:
     load_dotenv(ROOT / ".env")
     ap = argparse.ArgumentParser(description="急騰日の要因分析")
     ap.add_argument("code", help="銘柄コード（例: 7203）")
-    ap.add_argument("--years", type=float, default=3.0, help="遡る年数（Light は最大5年）")
+    ap.add_argument("--years", type=float, default=None, help="遡る年数（既定 5・Light の上限）")
     ap.add_argument("--name", help="ニュース検索に使う会社名（未指定なら J-Quants から取得）")
     ap.add_argument("--no-news", action="store_true", help="ニュース取得を省く")
     ap.add_argument("--no-edinet", action="store_true", help="EDINET 照合を省く")
-    ap.add_argument("--pct", type=float, help="急騰の前日比しきい値（%）")
+    ap.add_argument("--pct", type=float, help="急騰のしきい値（前日終値比 %%・既定 8）")
     args = ap.parse_args()
 
     cfg = SpikeConfig.from_env()
     if args.pct is not None:
-        cfg = SpikeConfig(pct=args.pct, pct_with_volume=cfg.pct_with_volume, vol_ratio=cfg.vol_ratio)
+        cfg = SpikeConfig(pct=args.pct, years=cfg.years)
 
     res = pipeline.analyze(args.code, args.years, cfg=cfg, with_news=not args.no_news,
                            with_edinet=not args.no_edinet, name=args.name)

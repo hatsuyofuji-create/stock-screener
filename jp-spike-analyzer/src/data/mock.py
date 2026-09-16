@@ -18,7 +18,7 @@ from .tdnet import tag_title
 _SPIKE_PLAN = [
     {"back": 400, "pct": 0.12, "kind": "決算"},
     {"back": 260, "pct": 0.09, "kind": "業績修正"},
-    {"back": 150, "pct": 0.07, "kind": "自己株"},
+    {"back": 150, "pct": 0.09, "kind": "自己株"},
     {"back": 60, "pct": 0.15, "kind": "TOB"},
     {"back": 12, "pct": 0.085, "kind": "地合い"},
 ]

@@ -40,20 +40,15 @@ def add_features(bars: pd.DataFrame, cfg: SpikeConfig) -> pd.DataFrame:
 def detect_spikes(bars: pd.DataFrame, cfg: SpikeConfig | None = None) -> pd.DataFrame:
     """急騰日を抽出する。
 
-    判定:
-      - pct >= cfg.pct
-      - または pct >= cfg.pct_with_volume かつ vol_ratio >= cfg.vol_ratio
+    判定: 前日終値 → 当日終値（翌営業日終値）の変化率 pct が cfg.pct % 以上。
+    出来高倍率・寄付ギャップは表示用に併記するだけで、判定には使わない。
     """
     cfg = cfg or SpikeConfig()
     if bars is None or bars.empty or "close" not in bars:
         return pd.DataFrame(columns=["date", "close", "pct", "gap_pct", "high_pct", "vol_ratio", "reason"])
     df = add_features(bars, cfg)
-    by_pct = df["pct"] >= cfg.pct
-    by_vol = (df["pct"] >= cfg.pct_with_volume) & (df["vol_ratio"] >= cfg.vol_ratio)
-    hit = df[by_pct | by_vol].copy()
-    hit["reason"] = np.where(
-        by_pct[hit.index], f"前日比{cfg.pct:g}%以上", f"前日比{cfg.pct_with_volume:g}%以上＋出来高{cfg.vol_ratio:g}倍以上"
-    )
+    hit = df[df["pct"] >= cfg.pct].copy()
+    hit["reason"] = f"前日終値比{cfg.pct:g}%以上"
     cols = ["close", "pct", "gap_pct", "high_pct", "vol_ratio", "reason"] + [f"fwd_{n}" for n in cfg.forward_days]
     out = hit[cols].reset_index().rename(columns={"index": "date"})
     if "date" not in out.columns:  # index 名が date だった場合

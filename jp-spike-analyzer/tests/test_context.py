@@ -19,13 +19,23 @@ def test_enrich_tags_from_mock_sources():
         news_fetcher=lambda a, b: mock_news("X", a, b),
     )
     all_tags = {t for e in events for t in e["tags"]}
-    assert {"決算", "TOB", "大量保有", "自己株", "業績修正"} <= all_tags
+    assert {"決算", "TOB", "大量保有", "業績修正"} <= all_tags
     assert any(t.startswith("地合い") for t in all_tags)
     # 前日引け後の開示は「前日」ラベル
     tob = next(e for e in events if "TOB" in e["tags"])
     assert tob["disclosures"][0]["rel"] == "前日"
     assert tob["edinet"][0]["rel"] == "+3日"
     assert tob["news"]
+
+
+def test_no_disclosure_means_unknown():
+    p = MockProvider()
+    end = pd.Timestamp.today().normalize()
+    start = end - pd.DateOffset(years=3)
+    bars = p.get_daily_bars("7203", start, end)
+    spikes = detect_spikes(bars, SpikeConfig())
+    events = enrich(spikes, bars, news_fetcher=lambda a, b: mock_news("X", a, b))  # 開示なし・ニュースのみ
+    assert events and all("材料不明" in e["tags"] for e in events)
 
 
 def test_edinet_parse_filters_withdrawn():

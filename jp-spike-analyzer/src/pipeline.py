@@ -25,11 +25,12 @@ from src.data.provider import get_provider, is_mock, normalize_code  # noqa: E40
 from src.data.tdnet import TdnetStore  # noqa: E402
 
 
-def analyze(code: str, years: float = 3.0, *, cfg: SpikeConfig | None = None,
+def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = None,
             with_news: bool = True, with_edinet: bool = True, name: str | None = None,
             log=print) -> dict:
     """銘柄コードを受け取り、急騰日と文脈をまとめた dict を返す。"""
     cfg = cfg or SpikeConfig.from_env()
+    years = cfg.years if years is None else years
     code = normalize_code(code)
     end = pd.Timestamp.today().normalize()
     start = end - pd.DateOffset(years=years)
@@ -43,7 +44,7 @@ def analyze(code: str, years: float = 3.0, *, cfg: SpikeConfig | None = None,
     log(f"日足 {len(bars)} 営業日 / 銘柄名: {company}")
 
     spikes = spikes_mod.detect_spikes(bars, cfg)
-    log(f"急騰日: {len(spikes)} 件（{cfg.pct:g}% 以上 / {cfg.pct_with_volume:g}%+出来高{cfg.vol_ratio:g}倍）")
+    log(f"急騰日: {len(spikes)} 件（前日終値比 {cfg.pct:g}% 以上）")
 
     topix = provider.get_market_index(start, end)
     statements = provider.get_statements(code)
@@ -88,7 +89,7 @@ def analyze(code: str, years: float = 3.0, *, cfg: SpikeConfig | None = None,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "start": start.strftime("%Y-%m-%d"),
         "end": end.strftime("%Y-%m-%d"),
-        "config": {"pct": cfg.pct, "pct_with_volume": cfg.pct_with_volume, "vol_ratio": cfg.vol_ratio},
+        "config": {"pct": cfg.pct, "years": years},
         "n_days": int(len(bars)),
         "spikes": events,
         "_bars": bars,  # 画面のチャート用（JSON には書かない）

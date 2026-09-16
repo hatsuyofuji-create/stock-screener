@@ -23,13 +23,12 @@ def _env_float(name: str, default: float) -> float:
 class SpikeConfig:
     """急騰判定のしきい値。"""
 
-    # 前日比（%）がこれ以上なら無条件で急騰
+    # 急騰の定義: 前日終値 → 翌営業日終値 の変化率（%）がこれ以上
     pct: float = 8.0
-    # 前日比（%）がこれ以上 かつ 出来高倍率が vol_ratio 以上でも急騰
-    pct_with_volume: float = 5.0
-    vol_ratio: float = 3.0
-    # 出来高倍率の分母（直近N日平均、当日は含めない）
+    # 出来高倍率（表示用）の分母: 直近N日平均（当日は含めない）
     vol_window: int = 20
+    # 遡る年数の初期値（J-Quants Light は最大5年）
+    years: float = 5.0
     # 急騰後の追随を見るための保有日数
     forward_days: tuple[int, ...] = (5, 20)
 
@@ -37,8 +36,7 @@ class SpikeConfig:
     def from_env(cls) -> "SpikeConfig":
         return cls(
             pct=_env_float("SPIKE_PCT", cls.pct),
-            pct_with_volume=_env_float("SPIKE_PCT_WITH_VOLUME", cls.pct_with_volume),
-            vol_ratio=_env_float("SPIKE_VOL_RATIO", cls.vol_ratio),
+            years=_env_float("SPIKE_YEARS", cls.years),
         )
 
 

@@ -8,7 +8,7 @@
   - disclosures: 前日〜翌日の適時開示（TDnet 蓄積 + バックフィル）
   - edinet:      前日〜5営業日後の EDINET 提出書類
   - news:        前2営業日〜翌日のニュース見出し
-  - tags:        上の情報から機械的に付けた要因タグ（決算 / 業績修正 / 自己株 / TOB / 地合い / 出来高急増 / 材料不明 …）
+  - tags:        上の情報から機械的に付けた要因タグ（決算 / 業績修正 / 自己株 / TOB / 地合い / 出来高急増 / 材料不明）。ニュース見出しは参考表示のみでタグには使わない
 """
 
 from __future__ import annotations
@@ -190,11 +190,9 @@ def enrich(
         # 出来高・材料不明
         if rec["vol_ratio"] is not None and rec["vol_ratio"] >= 3.0:
             tags.append("出来高急増")
+        # 開示・決算・EDINET に基づくタグが一つも無ければ「材料不明」（ニュース見出しは参考表示のみ）
         if not any(t for t in tags if not t.startswith("地合い") and t != "出来高急増"):
-            if not rec["news"]:
-                tags.append("材料不明")
-            else:
-                tags.append("ニュースのみ")
+            tags.append("材料不明")
         rec["tags"] = tags
         out.append(rec)
     return out

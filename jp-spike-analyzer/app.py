@@ -36,11 +36,9 @@ st.caption("過去の急騰日を抽出し、決算・適時開示・EDINET・�
 with st.sidebar:
     st.header("設定")
     code = st.text_input("銘柄コード", value="7203", max_chars=5)
-    years = st.slider("遡る年数", min_value=1.0, max_value=5.0, value=3.0, step=0.5)
     env_cfg = SpikeConfig.from_env()
-    pct = st.number_input("急騰: 前日比（%）以上", value=float(env_cfg.pct), step=0.5)
-    pct_v = st.number_input("または 前日比（%）以上 ＋", value=float(env_cfg.pct_with_volume), step=0.5)
-    vol_r = st.number_input("出来高が20日平均の（倍）以上", value=float(env_cfg.vol_ratio), step=0.5)
+    years = st.slider("遡る年数", min_value=1.0, max_value=5.0, value=float(min(env_cfg.years, 5.0)), step=0.5)
+    pct = st.number_input("急騰: 前日終値比（%）以上", value=float(env_cfg.pct), step=0.5)
     with_news = st.checkbox("ニュース見出しを取得（Google News）", value=True)
     with_edinet = st.checkbox("EDINET を照合", value=True)
     run = st.button("分析する", type="primary")
@@ -59,8 +57,8 @@ with st.sidebar:
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def _run(code: str, years: float, pct: float, pct_v: float, vol_r: float, with_news: bool, with_edinet: bool):
-    cfg = SpikeConfig(pct=pct, pct_with_volume=pct_v, vol_ratio=vol_r)
+def _run(code: str, years: float, pct: float, with_news: bool, with_edinet: bool):
+    cfg = SpikeConfig(pct=pct)
     logs: list[str] = []
     res = pipeline.analyze(code, years, cfg=cfg, with_news=with_news, with_edinet=with_edinet, log=logs.append)
     bars = res.pop("_bars")
@@ -75,7 +73,7 @@ if run:
     else:
         with st.spinner("取得・分析中…（初回は J-Quants / ニュース取得に時間がかかります）"):
             try:
-                st.session_state["result"] = _run(code.strip(), years, pct, pct_v, vol_r, with_news, with_edinet)
+                st.session_state["result"] = _run(code.strip(), years, pct, with_news, with_edinet)
             except Exception as e:  # noqa: BLE001
                 st.session_state["result"] = None
                 st.error(f"分析に失敗しました: {e}")
@@ -92,7 +90,7 @@ st.subheader(f"{res['name']}（{res['code']}）  {res['start']} 〜 {res['end']}
 c = st.columns(4)
 c[0].metric("営業日数", f"{res['n_days']:,}")
 c[1].metric("急騰日", f"{len(spikes)} 件")
-tagged = sum(1 for s in spikes if not any(t in ("材料不明", "ニュースのみ") for t in s["tags"]))
+tagged = sum(1 for s in spikes if "材料不明" not in s["tags"])
 c[2].metric("要因が特定できた日", f"{tagged} 件")
 c[3].metric("材料不明", f"{sum(1 for s in spikes if '材料不明' in s['tags'])} 件")
 with st.expander("取得ログ"):

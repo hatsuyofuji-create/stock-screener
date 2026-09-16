@@ -25,16 +25,16 @@ def test_detects_pct_spike():
     assert "8%" in out["reason"].iloc[0]
 
 
-def test_detects_volume_spike_only_with_volume():
+def test_volume_alone_is_not_a_spike():
     df = _bars()
     i = 45
     df.iloc[i, df.columns.get_loc("close")] = df["close"].iloc[i - 1] * 1.06
-    assert detect_spikes(df, SpikeConfig()).empty  # 6% だけでは急騰ではない
-    df.iloc[i, df.columns.get_loc("volume")] = 50000.0  # 5倍
+    df.iloc[i, df.columns.get_loc("volume")] = 50000.0  # 出来高5倍でも 6% では急騰ではない
+    assert detect_spikes(df, SpikeConfig()).empty
+    df.iloc[i, df.columns.get_loc("close")] = df["close"].iloc[i - 1] * 1.08  # ちょうど 8% は急騰
     out = detect_spikes(df, SpikeConfig())
     assert len(out) == 1
-    assert out["vol_ratio"].iloc[0] > 3.0
-    assert "出来高" in out["reason"].iloc[0]
+    assert out["vol_ratio"].iloc[0] > 3.0  # 表示用に併記される
 
 
 def test_forward_returns_and_gap():
