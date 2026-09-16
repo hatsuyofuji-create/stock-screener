@@ -139,7 +139,16 @@ class MockProvider(PriceProvider):
                     "forecast_sales": 4.9e11, "forecast_operating_profit": 4.4e10, "forecast_profit": 3.1e10,
                     "next_fy_forecast_sales": None, "next_fy_forecast_operating_profit": None, "next_fy_forecast_profit": None,
                 })
+        # 配当予想修正（増配）を1つ
+        d = self.dates[self.days - 320]
+        recs.append({"disclosed_date": d, "disclosed_time": "15:30:00", "doc_type": "DividendForecastRevision",
+                     "period": "", "fy_end": pd.Timestamp(year=d.year + (1 if d.month >= 4 else 0), month=3, day=31),
+                     "forecast_dividend_annual": 40.0})
         df = pd.DataFrame(recs, columns=STATEMENT_COLUMNS)
+        # 決算行に配当（年間 30 円→毎年 +2 円）と経常/純利益の予想を入れる
+        fy_rows = df["doc_type"].str.contains("FinancialStatements", na=False)
+        df.loc[fy_rows, "forecast_dividend_annual"] = df.loc[fy_rows, "fy_end"].dt.year.map(lambda y: 30.0 + 2 * (y - 2024))
+        df.loc[fy_rows, "forecast_ordinary_profit"] = df.loc[fy_rows, "forecast_operating_profit"] * 1.05
         return df.sort_values(["disclosed_date", "disclosed_time"]).reset_index(drop=True)
 
     def get_market_index(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:

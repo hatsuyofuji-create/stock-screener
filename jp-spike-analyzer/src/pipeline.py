@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from config import EDINET_WINDOW, SpikeConfig  # noqa: E402
 from src.compute import context as ctx_mod  # noqa: E402
+from src.compute import reactions as reactions_mod  # noqa: E402
 from src.compute import spikes as spikes_mod  # noqa: E402
 from src.data import edinet as edinet_mod  # noqa: E402
 from src.data import mock as mock_mod  # noqa: E402
@@ -138,4 +139,42 @@ def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = 
         "n_days": int(len(bars)),
         "spikes": events,
         "_bars": bars,  # 画面のチャート用（JSON には書かない）
+    }
+
+
+def analyze_earnings(code: str, years: float | None = None, *, include_dividend: bool = True,
+                     name: str | None = None, log=print) -> dict:
+    """銘柄コードを受け取り、決算ごとの業績と株価反応をまとめた dict を返す。"""
+    cfg = SpikeConfig.from_env()
+    years = cfg.years if years is None else years
+    code = normalize_code(code)
+    end = pd.Timestamp.today().normalize()
+    start = end - pd.DateOffset(years=years)
+    provider = get_provider()
+    log(f"データ提供元: {provider.name} / 銘柄: {code} / 期間: {start.date()}〜{end.date()}")
+
+    # 前年同期比を出すため、決算は期間より1年余分に取る（株価は期間内のみ）
+    bars = provider.get_daily_bars(code, start - pd.DateOffset(days=40), end)
+    if bars.empty:
+        raise RuntimeError(f"{code} の日足が空でした。")
+    company = name or provider.get_company_name(code)
+    statements = provider.get_statements(code)
+    topix = provider.get_market_index(start - pd.DateOffset(days=40), end)
+    log(f"日足 {len(bars)} 営業日 / 決算情報 {len(statements)} 件 / 指数 {len(topix)} 営業日 / 銘柄名: {company}")
+
+    events = reactions_mod.build_events(statements, bars, topix, include_dividend=include_dividend)
+    events = [e for e in events if pd.Timestamp(e["reaction_date"]) >= start]
+    summary = reactions_mod.summarize(events)
+    log(f"決算イベント: {len(events)} 件（期間内）")
+    return {
+        "code": code,
+        "name": company,
+        "provider": provider.name,
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "start": start.strftime("%Y-%m-%d"),
+        "end": end.strftime("%Y-%m-%d"),
+        "n_days": int((bars.index >= start).sum()),
+        "events": events,
+        "summary": summary,
+        "_bars": bars[bars.index >= start],
     }

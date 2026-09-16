@@ -1,11 +1,14 @@
 # CLAUDE.md — jp-spike-analyzer 設計メモ
 
-過去の株価から急騰日を抽出し、「その時何が起きていたか」を決算・適時開示・EDINET・ニュース・TOPIX で
-説明する **表示専用ツール**。売買判断・発注ロジックは持たない。
+**決算で株価がどう動いたか**（モード1・メイン）と、**急騰・急落日に何が起きていたか**（モード2）を
+決算・適時開示・EDINET・ニュース・TOPIX で説明する **表示専用ツール**。売買判断・発注ロジックは持たない。
 
 ## 全体像
 
 ```
+ [モード1] J-Quants(日足/決算/指数代用) → pipeline.analyze_earnings → reactions.build_events(earnings.evaluate) → dict
+                                                                        → analyze_earnings.py / app.py
+ [モード2]
  J-Quants(日足/決算/TOPIX) ─┐
  TDnet 蓄積 db/tdnet/*.csv ─┼→ pipeline.analyze → spikes.detect_spikes → context.enrich → dict
  EDINET API                ─┤        ↑                                                   ↓
@@ -21,13 +24,14 @@
 ```
 （リポジトリ直下）アプリ起動.bat / 分析.bat / 更新.bat   Windows 用のダブルクリック起動
 jp-spike-analyzer/
-├── analyze.py            CLI（取得→検出→文脈付け→JSON 保存）
+├── analyze_earnings.py   CLI モード1（決算ごとの業績評価と株価反応）
+├── analyze.py            CLI モード2（急騰・急落の要因）
 ├── app.py                Streamlit（pipeline を呼んで表示するだけ）
 ├── update_daily.py       TDnet 公式の取り込み（手動用。通常は分析時に自動）
 ├── backfill_tdnet.py     蓄積開始前の過去分を非公式 API で補完
 ├── config.py             急騰しきい値・照合窓（.env で上書き可）
 ├── src/
-│   ├── pipeline.py       analyze(code, years) の入口
+│   ├── pipeline.py       analyze_earnings(code, years) / analyze(code, years) の入口
 │   ├── data/
 │   │   ├── provider.py   PriceProvider 抽象基底 + get_provider() + normalize_code()
 │   │   ├── mock.py       MockProvider + mock_disclosures / mock_edinet / mock_news
@@ -38,7 +42,8 @@ jp-spike-analyzer/
 │   │   └── news.py       Google News RSS
 │   └── compute/
 │       ├── spikes.py     急騰検出（pct / gap / vol_ratio / fwd_N）
-│       ├── earnings.py   決算・業績修正の数値評価（好決算/悪決算/上方修正/下方修正 と根拠）
+│       ├── earnings.py   決算・業績修正・配当修正の数値評価（好決算/悪決算/上方修正/下方修正/増配/減配 と根拠）
+│       ├── reactions.py  決算ごとの株価反応（反応日の決定、翌日/寄付/高安/出来高/5日/20日/対TOPIX、傾向集計）
 │       └── context.py    急騰日ごとの文脈収集と要因タグ
 ├── tests/                pytest（ネット不要）
 └── db/
@@ -60,7 +65,13 @@ jp-spike-analyzer/
 - 秘密情報はコード直書き禁止。`.env`（`.gitignore` 済み）と GitHub Secrets のみ。
 - 表示専用の方針を変えない（売買判定・発注は追加しない）。
 
-## 急騰の定義と文脈の窓（config.py）
+## モード1 の決め事（reactions.py）
+
+- 反応日: 発表時刻 < 15:00 なら発表日（休場なら次の営業日）、それ以外は次の営業日
+- 反応の指標は反応日の前営業日終値からの変化率。5日/20日後も同じ基準
+- 評価の GOOD = {好決算, 上方修正, 増配}、BAD = {悪決算, 下方修正, 減配}
+
+## モード2: 急騰の定義と文脈の窓（config.py）
 
 - 急騰（起点）: 前日終値→翌営業日終値 `pct >= 8%`、急落: `pct <= -8%`（`direction` = up / down / both）。
   出来高倍率は表示のみ（判定に使わない）。既定は3年（最大5年）

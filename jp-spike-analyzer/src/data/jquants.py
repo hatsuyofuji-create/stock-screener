@@ -31,8 +31,9 @@ _TIMEOUT = 30
 
 STATEMENT_NUMERIC = [
     "net_sales", "operating_profit", "ordinary_profit", "profit", "eps",
-    "forecast_sales", "forecast_operating_profit", "forecast_profit",
-    "next_fy_forecast_sales", "next_fy_forecast_operating_profit", "next_fy_forecast_profit",
+    "forecast_sales", "forecast_operating_profit", "forecast_ordinary_profit", "forecast_profit",
+    "next_fy_forecast_sales", "next_fy_forecast_operating_profit", "next_fy_forecast_ordinary_profit", "next_fy_forecast_profit",
+    "dividend_annual", "forecast_dividend_annual",
 ]
 STATEMENT_COLUMNS = ["disclosed_date", "disclosed_time", "doc_type", "period", "fy_end"] + STATEMENT_NUMERIC
 _CACHE_TTL_SEC = 24 * 3600
@@ -166,11 +167,15 @@ class JQuantsProvider(PriceProvider):
                 "eps": _first(row, "EPS", "EarningsPerShare"),
                 "forecast_sales": _first(row, "FSales", "ForecastNetSales"),
                 "forecast_operating_profit": _first(row, "FOP", "ForecastOperatingProfit", "FcstOP"),
+                "forecast_ordinary_profit": _first(row, "FOdP", "ForecastOrdinaryProfit"),
                 "forecast_profit": _first(row, "FNP", "ForecastProfit", "FcstNP"),
                 "next_fy_forecast_sales": _first(row, "NxFSales", "NxtFSales", "NYFSales", "NextYearForecastNetSales"),
                 "next_fy_forecast_operating_profit": _first(
                     row, "NxFOP", "NxtFOP", "NYFOP", "NextYearForecastOperatingProfit"),
+                "next_fy_forecast_ordinary_profit": _first(row, "NxFOdP", "NextYearForecastOrdinaryProfit"),
                 "next_fy_forecast_profit": _first(row, "NxFNP", "NxtFNP", "NYFNP", "NextYearForecastProfit"),
+                "dividend_annual": _first(row, "DivAnn", "ResultDividendPerShareAnnual"),
+                "forecast_dividend_annual": _first(row, "FDivAnn", "ForecastDividendPerShareAnnual"),
             })
         if not recs:
             return pd.DataFrame(columns=STATEMENT_COLUMNS)
