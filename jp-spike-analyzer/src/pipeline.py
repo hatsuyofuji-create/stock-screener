@@ -25,6 +25,43 @@ from src.data.provider import get_provider, is_mock, normalize_code  # noqa: E40
 from src.data.tdnet import TdnetStore  # noqa: E402
 
 
+def ensure_tdnet_uptodate(store: TdnetStore, *, log=print, max_days: int = 31) -> int:
+    """公式 TDnet（直近1か月のみ閲覧可）から、まだ貯めていない日を取り込む。
+
+    最後に貯めた日から今日までを平日ごとに読む（最後の日は取りこぼし防止で読み直す）。
+    失敗しても分析は続ける。戻り値は追加件数。"""
+    from datetime import date, timedelta
+
+    from src.data import tdnet
+
+    today = date.today()
+    _, hi = store.coverage()
+    first = today - timedelta(days=max_days)
+    if hi is not None:
+        first = max(first, hi.date() - timedelta(days=1))
+    days = [first + timedelta(days=i) for i in range((today - first).days + 1)]
+    days = [d for d in days if d.weekday() < 5]
+    if not days:
+        return 0
+    added = 0
+    ok = 0
+    try:
+        import requests
+
+        session = requests.Session()
+        for d in days:
+            df = tdnet.fetch_official_day(d, session=session, sleep=0.3)
+            added += store.upsert(df)
+            ok += 1
+    except Exception as e:  # noqa: BLE001
+        log(f"[tdnet] 自動取り込みを中断（{ok}/{len(days)} 日まで）: {str(e)[:120]}")
+    if hi is not None and (first - hi.date()).days > max_days:
+        log(f"[tdnet] 前回の蓄積（{hi.date()}）から1か月以上空いています。"
+            f" 抜けは `python backfill_tdnet.py --range {hi.date()} {today}` で補えます")
+    log(f"適時開示の自動取り込み: {len(days)} 日分を確認 / {added} 件追加")
+    return added
+
+
 def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = None,
             with_news: bool = True, with_edinet: bool = True, name: str | None = None,
             log=print) -> dict:
@@ -54,7 +91,9 @@ def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = 
     if mock:
         disclosures = mock_mod.mock_disclosures(code, start, end)
     else:
-        disclosures = TdnetStore().load(code, start, end)
+        store = TdnetStore()
+        ensure_tdnet_uptodate(store, log=log)
+        disclosures = store.load(code, start, end)
     log(f"適時開示: {len(disclosures)} 件（蓄積分）")
 
     edinet = None

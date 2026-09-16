@@ -5,7 +5,7 @@
 
 - 分析（CLI）: `analyze.py` → `db/analysis/<code>.json`
 - 表示: `app.py`（Streamlit）
-- 適時開示の蓄積（バッチ）: `update_daily.py`（JPX TDnet 公式・毎営業日）
+- 適時開示の蓄積: 分析のたびに自動（JPX TDnet 公式）。手動なら `update_daily.py`
 - 適時開示の過去分補完（一度だけ）: `backfill_tdnet.py`（非公式 TDnet WebAPI）
 - データは Provider 経由（`mock` = 鍵不要 / `jquants` = 本番・Light プラン想定）
 
@@ -56,14 +56,16 @@ cp .env.example .env
 
 ### 適時開示（TDnet）
 
-公式の TDnet 一覧は**直近1か月しか見られない**ので、毎営業日クロールして貯めます。
+公式の TDnet 一覧は**直近1か月しか見られない**ので、手元に貯めて使います。
+**`analyze.py` / `app.py` を実行するたびに、まだ貯めていない日を自動で取りに行く**ので、
+月に1回以上使っていれば途切れません。手動で取り込むこともできます。
 
 ```bash
-python update_daily.py --days 30   # 初回: 見られる範囲をまとめて取り込む
-python update_daily.py             # 以降は毎営業日（GitHub Actions でも可）
+python update_daily.py --days 30   # 手動で直近30日を取り込む
 ```
 
-貯まる先は `db/tdnet/YYYY-MM.csv`（全銘柄・種別タグ付き。git で追跡）。
+貯まる先は `db/tdnet/YYYY-MM.csv`（全銘柄・種別タグ付き。各自のパソコン内のみ、git には入れない）。
+1か月以上使わずに抜けができた場合は `python backfill_tdnet.py --range 開始日 終了日` で埋められます。
 
 蓄積開始より前の期間は、非公式の TDnet WebAPI（yanoshin.jp）で一度だけ補完できます。
 
@@ -103,7 +105,11 @@ streamlit run app.py
 | ニュース見出し | Google News RSS | 2営業日前〜翌日 |
 | 要因タグ | 上を機械的に要約 | 決算 / 業績修正 / 自己株 / TOB / 大量保有 / 地合い / 出来高急増 / 材料不明 |
 
-## 4. GitHub Actions で適時開示を自動蓄積
+## 4. 更新の取り込み
 
-`.github/workflows/spike-tdnet.yml` が平日 18:30 JST に `update_daily.py` を実行し、
-`db/tdnet/*.csv` をコミットします。シークレットは不要です（公式 TDnet はキー不要）。
+コードが更新されたら、`jp-spike-analyzer` フォルダで次を実行します。
+
+```bash
+git pull
+pip install -r requirements.txt
+```

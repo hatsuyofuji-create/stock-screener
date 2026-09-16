@@ -11,7 +11,8 @@
  EDINET API                ─┤        ↑                                                   ↓
  Google News RSS           ─┘   analyze.py(CLI) / app.py(Streamlit)          db/analysis/<code>.json
 
- update_daily.py  → TDnet 公式一覧（当日・全銘柄）→ TdnetStore.upsert → db/tdnet/YYYY-MM.csv
+ pipeline.ensure_tdnet_uptodate → TDnet 公式一覧（未取得日・全銘柄）→ TdnetStore.upsert → db/tdnet/YYYY-MM.csv
+ update_daily.py   → 同じことを手動で
  backfill_tdnet.py → 非公式 TDnet WebAPI（過去分・一度だけ）→ 同じ store
 ```
 
@@ -21,7 +22,7 @@
 jp-spike-analyzer/
 ├── analyze.py            CLI（取得→検出→文脈付け→JSON 保存）
 ├── app.py                Streamlit（pipeline を呼んで表示するだけ）
-├── update_daily.py       TDnet 公式の日次蓄積バッチ
+├── update_daily.py       TDnet 公式の取り込み（手動用。通常は分析時に自動）
 ├── backfill_tdnet.py     蓄積開始前の過去分を非公式 API で補完
 ├── config.py             急騰しきい値・照合窓（.env で上書き可）
 ├── src/
@@ -39,7 +40,7 @@ jp-spike-analyzer/
 │       └── context.py    急騰日ごとの文脈収集と要因タグ
 ├── tests/                pytest（ネット不要）
 └── db/
-    ├── tdnet/            適時開示の蓄積（git 追跡）
+    ├── tdnet/            適時開示の蓄積（各自のパソコン内のみ・無視）
     ├── cache/            J-Quants / EDINET のキャッシュ（無視）
     └── analysis/         analyze.py の出力（無視）
 ```
@@ -52,7 +53,8 @@ jp-spike-analyzer/
 - 外部ソースが落ちても本体は続行する（TOPIX / EDINET / ニュースは空で返す）。
 - J-Quants は **Light** 前提（日足5年、決算 `/fins/summary`）。指数は Light で取れないので TOPIX連動ETF 1306.T を yfinance で代用。フィールド名は V2 短縮名を第一候補に
   V1 名へフォールバック（`_first()`）。特定できないときは実フィールド名を例外に出す。
-- 適時開示は **公式 TDnet を日次で貯める**のが主。非公式 API はバックフィル専用で、止まっても日次に影響しない。
+- 適時開示は **公式 TDnet を分析のたびに自動で貯める**（直近1か月しか見られないため）。非公式 API は
+  バックフィル専用で、止まっても自動取り込みに影響しない。蓄積は各自のパソコン内で、git には入れない。
 - 秘密情報はコード直書き禁止。`.env`（`.gitignore` 済み）と GitHub Secrets のみ。
 - 表示専用の方針を変えない（売買判定・発注は追加しない）。
 
@@ -66,8 +68,8 @@ jp-spike-analyzer/
 
 ## 未検証・TODO
 
-- J-Quants は日足（/equities/bars/daily）と銘柄名（/equities/master）を実データで確認済み。
-  /fins/summary・TDnet・EDINET・Google News・yfinance(1306.T) は実応答で未確認。エラー時は例外メッセージ中の
+- J-Quants（日足・銘柄名・/fins/summary）、TDnet 公式クロール、非公式バックフィル、Google News、yfinance(1306.T) は
+  実データで動作確認済み（2026-09-16）。EDINET は未確認。エラー時は例外メッセージ中の
   実フィールド名を見て `_first()` の候補を直す。
 - TDnet 一覧 HTML の td クラス名（kjTime / kjCode / kjName / kjTitle）が変わったら `tdnet.parse_list_page` を直す。
 - 祝日判定は未実装（土日のみ除外。休場日は TDnet が空を返すので実害なし）。
