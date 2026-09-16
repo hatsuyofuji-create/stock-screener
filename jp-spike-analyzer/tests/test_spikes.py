@@ -56,8 +56,9 @@ def test_empty_input():
 def test_down_and_both_directions():
     df = _bars()
     i, j = 20, 40
-    df.iloc[i, df.columns.get_loc("close")] = df["close"].iloc[i - 1] * 0.90
-    df.iloc[j, df.columns.get_loc("close")] = df["close"].iloc[j - 1] * 1.10
+    c = df.columns.get_loc("close")
+    df.iloc[i:, c] = df["close"].iloc[i:] * 0.90  # i 日目に -10% して、その水準が続く
+    df.iloc[j:, c] = df["close"].iloc[j:] * 1.10  # j 日目に +10%
     assert list(detect_spikes(df, SpikeConfig(direction="up"))["date"]) == [df.index[j]]
     down = detect_spikes(df, SpikeConfig(direction="down"))
     assert list(down["date"]) == [df.index[i]] and down["direction"].iloc[0] == "down"
