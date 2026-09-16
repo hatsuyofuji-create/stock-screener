@@ -171,7 +171,7 @@ for s in spikes:
         if with_news:
             st.markdown("**ニュース見出し**")
             if s["news"]:
-                for x in s["news"][:15]:
-                    st.write(f"- {x['date']}　[{x['title']}]({x['url']})　{x['publisher']}")
+                for x in s["news"][:20]:
+                    st.write(f"- [{x.get('rel', '')}] {x['date']}　[{x['title']}]({x['url']})　{x['publisher']}")
             else:
                 st.write("- 該当なし")

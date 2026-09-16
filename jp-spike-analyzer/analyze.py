@@ -44,8 +44,10 @@ def print_report(res: dict) -> None:
             print(f"   [開示 {x['rel']}] {x['date']} {x['time']} 〔{x['tag']}〕{x['title']}")
         for x in ev["edinet"]:
             print(f"   [EDINET {x['rel']}] {x['date']} {x['description']} ({x['filer']})")
-        for x in ev["news"][:8]:
-            print(f"   [ニュース] {x['date']} {x['title']} — {x['publisher']}")
+        for x in ev["news"][:12]:
+            print(f"   [ニュース {x['rel']}] {x['date']} {x['title']} — {x['publisher']}")
+        if len(ev["news"]) > 12:
+            print(f"   （ほか {len(ev['news']) - 12} 件は db/analysis の JSON に保存）")
 
 
 def main() -> int:

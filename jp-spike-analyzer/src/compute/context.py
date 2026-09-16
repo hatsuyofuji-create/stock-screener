@@ -179,13 +179,20 @@ def enrich(
                 print(f"[news] {d.date()} 取得失敗: {str(e)[:100]}")
                 nd = None
             if nd is not None and not nd.empty:
+                items = []
                 for _, r in nd.iterrows():
-                    rec["news"].append({
-                        "date": "" if pd.isna(r.get("date")) else pd.Timestamp(r["date"]).strftime("%Y-%m-%d"),
+                    nd_date = None if pd.isna(r.get("date")) else pd.Timestamp(r["date"]).normalize()
+                    # 急騰日当日 → 前日 → 翌日 → 2日前 の順（当日に近いものを優先）
+                    dist = 99 if nd_date is None else abs((nd_date - d).days) + (0.5 if nd_date > d else 0)
+                    items.append((dist, {
+                        "date": "" if nd_date is None else nd_date.strftime("%Y-%m-%d"),
+                        "rel": "" if nd_date is None else _rel_label(days, d, nd_date),
                         "title": str(r["title"]),
                         "url": str(r.get("url") or ""),
                         "publisher": str(r.get("publisher") or ""),
-                    })
+                    }))
+                items.sort(key=lambda x: x[0])
+                rec["news"] = [x[1] for x in items]
 
         # 出来高・材料不明
         if rec["vol_ratio"] is not None and rec["vol_ratio"] >= 3.0:

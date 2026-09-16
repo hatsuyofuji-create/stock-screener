@@ -48,6 +48,7 @@ def analyze(code: str, years: float | None = None, *, cfg: SpikeConfig | None = 
 
     topix = provider.get_market_index(start, end)
     statements = provider.get_statements(code)
+    log(f"決算情報: {len(statements)} 件 / 指数: {len(topix)} 営業日")
 
     mock = is_mock()
     if mock:
