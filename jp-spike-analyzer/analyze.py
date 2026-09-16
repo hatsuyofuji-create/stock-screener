@@ -39,7 +39,9 @@ def print_report(res: dict) -> None:
               f"TOPIX {_fmt(ev['topix_pct'])}  5日後 {_fmt(ev['fwd_5'])}  20日後 {_fmt(ev['fwd_20'])}")
         print(f"   要因タグ: {' / '.join(ev['tags']) or '—'}")
         for s in ev["statements"]:
-            print(f"   [決算 {s['rel']}] {s['date']} {s['time']} {s['doc_type']} {s['period']}")
+            print(f"   [{s['kind']} {s['rel']}] {s['date']} {s['time']} {s['period']}  → {s['label']}")
+            for line in s["details"]:
+                print(f"       ・{line}")
         for x in ev["disclosures"]:
             print(f"   [開示 {x['rel']}] {x['date']} {x['time']} 〔{x['tag']}〕{x['title']}")
         for x in ev["edinet"]:

@@ -80,23 +80,57 @@ class MockProvider(PriceProvider):
         return df[(df.index >= start) & (df.index <= end)].copy()
 
     def get_statements(self, code: str) -> pd.DataFrame:
-        """四半期ごとの決算発表 + 急騰日「決算」の前日引け後に短信を置く。"""
+        """四半期ごとの決算（数字入り）＋ 急騰日「決算」「業績修正」に対応する行。"""
+        from .jquants import STATEMENT_COLUMNS
+
         recs = []
-        for plan in _SPIKE_PLAN:
-            if plan["kind"] == "決算":
-                d = self.dates[self.days - plan["back"] - 1]
-                recs.append({"disclosed_date": d, "disclosed_time": "15:00:00",
-                             "doc_type": "2QFinancialStatements_Consolidated_JP", "period": "2Q",
-                             "net_sales": 1.2e11, "operating_profit": 1.8e10, "profit": 1.2e10,
-                             "eps": 85.2, "forecast_operating_profit": 3.9e10, "forecast_profit": 2.6e10})
-        # それ以外は 63営業日ごとに機械的に置く
-        for i in range(self.days - 30, 0, -63):
+        # 3月決算の会社として、各四半期の累計営業利益を機械的に作る（毎年 +12% 成長）
+        base_fy_op = 3.0e10
+        for i in range(self.days - 40, 0, -63):
             d = self.dates[i]
-            recs.append({"disclosed_date": d, "disclosed_time": "15:30:00",
-                         "doc_type": "FinancialStatements", "period": "",
-                         "net_sales": 1.0e11, "operating_profit": 1.2e10, "profit": 0.8e10,
-                         "eps": 60.0, "forecast_operating_profit": 3.5e10, "forecast_profit": 2.4e10})
-        return pd.DataFrame(recs).sort_values("disclosed_date").reset_index(drop=True)
+            # 単純化: 5/8/11/2 月に FY/1Q/2Q/3Q が出るものとして月から決める
+            m = d.month
+            period = {5: "FY", 8: "1Q", 11: "2Q", 2: "3Q"}.get(m, ["1Q", "2Q", "3Q", "FY"][i % 4])
+            fy_end_year = d.year if m <= 3 else d.year + (0 if period == "FY" else 1)
+            if period == "FY":
+                fy_end_year = d.year if m >= 4 else d.year - 1
+            fy_end = pd.Timestamp(year=fy_end_year, month=3, day=31)
+            growth = 1.12 ** (fy_end_year - 2024)
+            fy_op = base_fy_op * growth
+            frac = {"1Q": 0.25, "2Q": 0.5, "3Q": 0.75, "FY": 1.0}[period]
+            recs.append({
+                "disclosed_date": d, "disclosed_time": "15:30:00",
+                "doc_type": f"{period}FinancialStatements_Consolidated_JP", "period": period, "fy_end": fy_end,
+                "net_sales": 4.0e11 * growth * frac, "operating_profit": fy_op * frac, "ordinary_profit": fy_op * frac * 1.05,
+                "profit": fy_op * frac * 0.7, "eps": 60.0 * growth * frac,
+                "forecast_sales": 4.0e11 * growth, "forecast_operating_profit": fy_op, "forecast_profit": fy_op * 0.7,
+                "next_fy_forecast_sales": 4.0e11 * growth * 1.1 if period == "FY" else None,
+                "next_fy_forecast_operating_profit": fy_op * 1.15 if period == "FY" else None,
+                "next_fy_forecast_profit": fy_op * 0.7 * 1.15 if period == "FY" else None,
+            })
+        # 急騰日「決算」: 前日引け後に 2Q 好決算（進捗 62%・予想を上方修正）
+        for plan in _SPIKE_PLAN:
+            d = self.dates[self.days - plan["back"] - 1]
+            if plan["kind"] == "決算":
+                fy_end = pd.Timestamp(year=d.year + (1 if d.month >= 4 else 0), month=3, day=31)
+                recs.append({
+                    "disclosed_date": d, "disclosed_time": "15:00:00",
+                    "doc_type": "2QFinancialStatements_Consolidated_JP", "period": "2Q", "fy_end": fy_end,
+                    "net_sales": 2.6e11, "operating_profit": 2.3e10, "ordinary_profit": 2.4e10, "profit": 1.6e10, "eps": 85.2,
+                    "forecast_sales": 4.6e11, "forecast_operating_profit": 3.7e10, "forecast_profit": 2.6e10,
+                    "next_fy_forecast_sales": None, "next_fy_forecast_operating_profit": None, "next_fy_forecast_profit": None,
+                })
+            if plan["kind"] == "業績修正":
+                fy_end = pd.Timestamp(year=d.year + (1 if d.month >= 4 else 0), month=3, day=31)
+                recs.append({
+                    "disclosed_date": d, "disclosed_time": "15:30:00",
+                    "doc_type": "EarnForecastRevision", "period": "", "fy_end": fy_end,
+                    "net_sales": None, "operating_profit": None, "ordinary_profit": None, "profit": None, "eps": None,
+                    "forecast_sales": 4.9e11, "forecast_operating_profit": 4.4e10, "forecast_profit": 3.1e10,
+                    "next_fy_forecast_sales": None, "next_fy_forecast_operating_profit": None, "next_fy_forecast_profit": None,
+                })
+        df = pd.DataFrame(recs, columns=STATEMENT_COLUMNS)
+        return df.sort_values(["disclosed_date", "disclosed_time"]).reset_index(drop=True)
 
     def get_market_index(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
         assert self._topix is not None

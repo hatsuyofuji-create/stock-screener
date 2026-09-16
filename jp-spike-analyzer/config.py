@@ -27,8 +27,8 @@ class SpikeConfig:
     pct: float = 8.0
     # 出来高倍率（表示用）の分母: 直近N日平均（当日は含めない）
     vol_window: int = 20
-    # 遡る年数の初期値（J-Quants Light は最大5年）
-    years: float = 5.0
+    # 遡る年数の初期値（チャートの見やすさ優先。J-Quants Light は最大5年）
+    years: float = 3.0
     # 急騰後の追随を見るための保有日数
     forward_days: tuple[int, ...] = (5, 20)
 

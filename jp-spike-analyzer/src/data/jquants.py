@@ -28,6 +28,13 @@ import requests
 from .provider import PriceProvider, normalize_code
 
 _TIMEOUT = 30
+
+STATEMENT_NUMERIC = [
+    "net_sales", "operating_profit", "ordinary_profit", "profit", "eps",
+    "forecast_sales", "forecast_operating_profit", "forecast_profit",
+    "next_fy_forecast_sales", "next_fy_forecast_operating_profit", "next_fy_forecast_profit",
+]
+STATEMENT_COLUMNS = ["disclosed_date", "disclosed_time", "doc_type", "period", "fy_end"] + STATEMENT_NUMERIC
 _CACHE_TTL_SEC = 24 * 3600
 
 
@@ -145,24 +152,30 @@ class JQuantsProvider(PriceProvider):
             d = _first(row, "DisclosedDate", "DiscDate", "Date", "D")
             if d is None:
                 continue
+            fy_end = _first(row, "CurFYEn", "CurrentFiscalYearEndDate", "FYEnd")
             recs.append({
                 "disclosed_date": pd.Timestamp(d),
                 "disclosed_time": _first(row, "DisclosedTime", "DiscTime", "Time") or "",
                 "doc_type": _first(row, "TypeOfDocument", "DocType", "TypeOfDoc") or "",
                 "period": _first(row, "CurPerType", "TypeOfCurrentPeriod", "CurPeriodType", "PeriodType") or "",
+                "fy_end": pd.Timestamp(fy_end) if fy_end else pd.NaT,
                 "net_sales": _first(row, "Sales", "NetSales", "NS"),
                 "operating_profit": _first(row, "OP", "OperatingProfit", "OpProfit"),
+                "ordinary_profit": _first(row, "OdP", "OrdinaryProfit"),
                 "profit": _first(row, "NP", "Profit", "NetProfit"),
                 "eps": _first(row, "EPS", "EarningsPerShare"),
+                "forecast_sales": _first(row, "FSales", "ForecastNetSales"),
                 "forecast_operating_profit": _first(row, "FOP", "ForecastOperatingProfit", "FcstOP"),
                 "forecast_profit": _first(row, "FNP", "ForecastProfit", "FcstNP"),
+                "next_fy_forecast_sales": _first(row, "NxFSales", "NxtFSales", "NYFSales", "NextYearForecastNetSales"),
+                "next_fy_forecast_operating_profit": _first(
+                    row, "NxFOP", "NxtFOP", "NYFOP", "NextYearForecastOperatingProfit"),
+                "next_fy_forecast_profit": _first(row, "NxFNP", "NxtFNP", "NYFNP", "NextYearForecastProfit"),
             })
-        cols = ["disclosed_date", "disclosed_time", "doc_type", "period", "net_sales",
-                "operating_profit", "profit", "eps", "forecast_operating_profit", "forecast_profit"]
         if not recs:
-            return pd.DataFrame(columns=cols)
-        df = pd.DataFrame(recs)[cols]
-        for c in cols[4:]:
+            return pd.DataFrame(columns=STATEMENT_COLUMNS)
+        df = pd.DataFrame(recs)[STATEMENT_COLUMNS]
+        for c in STATEMENT_NUMERIC:
             df[c] = pd.to_numeric(df[c], errors="coerce")
         return df.sort_values(["disclosed_date", "disclosed_time"]).reset_index(drop=True)
 

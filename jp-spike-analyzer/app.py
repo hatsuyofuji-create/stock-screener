@@ -145,11 +145,11 @@ for s in spikes:
         st.caption(f"判定ルール: {s['rule']}　／　5日後 {_p(s['fwd_5'])}　20日後 {_p(s['fwd_20'])}")
 
         if s["statements"]:
-            st.markdown("**決算発表（J-Quants）**")
+            st.markdown("**決算・業績予想（J-Quants）**")
             for x in s["statements"]:
-                op = "" if x["operating_profit"] is None else f"　営業利益 {x['operating_profit']/1e8:,.0f}億円"
-                fop = "" if x["forecast_operating_profit"] is None else f"　通期予想 {x['forecast_operating_profit']/1e8:,.0f}億円"
-                st.write(f"- [{x['rel']}] {x['date']} {x['time']}　{x['doc_type']} {x['period']}{op}{fop}")
+                st.write(f"- [{x['rel']}] {x['date']} {x['time']}　{x['kind']} {x['period']}　**{x['label']}**")
+                for line in x["details"]:
+                    st.write(f"　　・{line}")
 
         st.markdown("**適時開示（TDnet）**")
         if s["disclosures"]:

@@ -19,7 +19,7 @@ def test_enrich_tags_from_mock_sources():
         news_fetcher=lambda a, b: mock_news("X", a, b),
     )
     all_tags = {t for e in events for t in e["tags"]}
-    assert {"決算", "TOB", "大量保有", "業績修正"} <= all_tags
+    assert {"好決算", "TOB", "大量保有", "上方修正"} <= all_tags
     assert any(t.startswith("地合い") for t in all_tags)
     # 前日引け後の開示は「前日」ラベル
     tob = next(e for e in events if "TOB" in e["tags"])

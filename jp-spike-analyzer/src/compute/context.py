@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.compute import earnings  # noqa: E402
 from src.data.tdnet import tag_title  # noqa: E402
 from config import (  # noqa: E402
     EDINET_WINDOW, MARKET_MOVE_PCT, NEWS_WINDOW, STATEMENT_WINDOW, TDNET_WINDOW,
@@ -117,19 +118,27 @@ def enrich(
         rec["statements"] = []
         if statements is not None and not statements.empty:
             a, b = window(days, d, STATEMENT_WINDOW)
-            sub = statements[(statements["disclosed_date"] >= a) & (statements["disclosed_date"] <= b)]
-            for _, r in sub.iterrows():
+            st_sorted = statements.sort_values(["disclosed_date", "disclosed_time"]).reset_index(drop=True)
+            hit_idx = st_sorted.index[(st_sorted["disclosed_date"] >= a) & (st_sorted["disclosed_date"] <= b)]
+            for i in hit_idx:
+                r = st_sorted.iloc[i]
+                ev = earnings.evaluate(st_sorted, int(i))
                 rec["statements"].append({
                     "date": pd.Timestamp(r["disclosed_date"]).strftime("%Y-%m-%d"),
                     "rel": _rel_label(days, d, r["disclosed_date"]),
                     "time": str(r.get("disclosed_time") or ""),
                     "doc_type": str(r.get("doc_type") or ""),
                     "period": str(r.get("period") or ""),
+                    "kind": ev["kind"],
+                    "label": ev["label"],
+                    "details": ev["details"],
+                    "metrics": {k: (None if v is None or pd.isna(v) else round(float(v), 1)) for k, v in ev["metrics"].items()},
                     "operating_profit": None if pd.isna(r.get("operating_profit")) else float(r["operating_profit"]),
                     "forecast_operating_profit": None if pd.isna(r.get("forecast_operating_profit")) else float(r["forecast_operating_profit"]),
                 })
-            if rec["statements"]:
-                tags.append("決算")
+            for x in rec["statements"]:
+                if x["label"] not in tags:
+                    tags.append(x["label"])
 
         # 適時開示
         rec["disclosures"] = []
@@ -146,10 +155,12 @@ def enrich(
                     "url": str(r.get("url") or ""),
                     "source": str(r.get("source") or ""),
                 })
+            has_eval = bool(rec["statements"])
             for t in dict.fromkeys(x["tag"] for x in rec["disclosures"]):
                 if t and t not in ("その他", "ガバナンス", "株主総会", "役員") and t not in tags:
-                    if not (t == "決算短信" and "決算" in tags):
-                        tags.append(t)
+                    if has_eval and t in ("決算短信", "業績修正"):
+                        continue  # J-Quants の数値評価（好決算/上方修正 など）が代わりに付いている
+                    tags.append(t)
 
         # EDINET
         rec["edinet"] = []
