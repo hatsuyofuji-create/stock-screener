@@ -1,0 +1,9 @@
+# jp-spike-analyzer 依存パッケージ
+pandas>=2.0
+numpy>=1.24
+requests>=2.31
+python-dotenv>=1.0
+beautifulsoup4>=4.12
+streamlit>=1.30
+altair>=5.0
+pytest>=8.0   # テスト用（任意）

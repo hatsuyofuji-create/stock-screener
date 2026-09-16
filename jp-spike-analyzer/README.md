@@ -1,0 +1,108 @@
+# jp-spike-analyzer
+
+過去の株価から**急騰日**を抽出し、その時に何が起きていたか（決算・適時開示・EDINET・ニュース見出し・TOPIX）を
+並べて確認する**表示専用ツール**。売買判断・発注は行いません。設計の詳細は [`CLAUDE.md`](CLAUDE.md)。
+
+- 分析（CLI）: `analyze.py` → `db/analysis/<code>.json`
+- 表示: `app.py`（Streamlit）
+- 適時開示の蓄積（バッチ）: `update_daily.py`（JPX TDnet 公式・毎営業日）
+- 適時開示の過去分補完（一度だけ）: `backfill_tdnet.py`（非公式 TDnet WebAPI）
+- データは Provider 経由（`mock` = 鍵不要 / `jquants` = 本番・Light プラン想定）
+
+---
+
+## セットアップ
+
+```bash
+cd jp-spike-analyzer
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## 1. まず mock で動作確認（鍵不要）
+
+```bash
+python analyze.py 7203             # 急騰日と要因タグがコンソールに出る
+streamlit run app.py               # 左のサイドバーで「分析する」
+python -m pytest -q tests          # テスト
+```
+
+mock では株価・決算・適時開示・EDINET・ニュースが全部ダミーになります。
+
+## 2. 本番データへ切り替え
+
+```bash
+cp .env.example .env
+# .env を編集: PROVIDER=jquants, JQUANTS_API_KEY=..., EDINET_API_KEY=...
+```
+
+### J-Quants（V2・APIキー方式・Light プラン）
+
+- ダッシュボードで **APIキー** を発行し `JQUANTS_API_KEY` に入れる（`x-api-key` ヘッダで送られます）
+- Light は日足が過去5年ぶん。`--years` は最大 5 を目安に
+- 33業種指数は Standard 以上なので、地合いの判定は **TOPIX のみ**。TOPIX が取れない場合も本体は続行します
+- 取得結果は `db/cache/jquants/` に1日キャッシュされます
+
+### EDINET API（金融庁・無料）
+
+臨時報告書・大量保有報告書・公開買付届出書・自己株券買付状況報告書を急騰日と照合します。
+
+1. <https://api.edinet-fsa.go.jp/api/auth/index.aspx?mode=1> を開く
+2. メールアドレスを登録 → 届いた認証コードを入力 → パスワードを設定
+3. ログインして「APIキー発行」→ 表示された文字列を `EDINET_API_KEY` に入れる
+
+未設定なら EDINET の照合だけスキップされます。日付ごとの結果は `db/cache/edinet/` にキャッシュされます。
+
+### 適時開示（TDnet）
+
+公式の TDnet 一覧は**直近1か月しか見られない**ので、毎営業日クロールして貯めます。
+
+```bash
+python update_daily.py --days 30   # 初回: 見られる範囲をまとめて取り込む
+python update_daily.py             # 以降は毎営業日（GitHub Actions でも可）
+```
+
+貯まる先は `db/tdnet/YYYY-MM.csv`（全銘柄・種別タグ付き。git で追跡）。
+
+蓄積開始より前の期間は、非公式の TDnet WebAPI（yanoshin.jp）で一度だけ補完できます。
+
+```bash
+python backfill_tdnet.py 7203 --years 5
+```
+
+個人運営の API なので止まる可能性があります。止まっても日次の公式クロールには影響しません。
+
+### ニュース見出し
+
+Google News RSS を「会社名 + 日付範囲」で検索し、見出しとリンクだけ表示します（本文は取りません）。
+会社名は J-Quants から取りますが、`--name` で上書きできます。`--no-news` で省略可。
+
+## 3. 分析する
+
+```bash
+PROVIDER=jquants python analyze.py 7203 --years 3
+streamlit run app.py
+```
+
+急騰の定義（初期値、`.env` かサイドバーで変更可）:
+
+- 前日比 **+8% 以上**
+- または 前日比 **+5% 以上** かつ 出来高が20日平均の **3倍以上**
+
+急騰日ごとに出るもの:
+
+| 項目 | 出所 | 窓 |
+|---|---|---|
+| 前日比・寄付ギャップ・出来高倍率・5日後/20日後 | J-Quants 日足 | 当日 |
+| TOPIX 同日騰落・対TOPIX 超過（+2% 以上なら「地合い」） | J-Quants | 当日 |
+| 決算発表 | J-Quants `/fins/statements` | 前日〜当日 |
+| 適時開示（種別タグ付き） | TDnet 蓄積 + バックフィル | 前日〜翌日 |
+| EDINET 提出書類 | EDINET API | 前日〜5営業日後 |
+| ニュース見出し | Google News RSS | 2営業日前〜翌日 |
+| 要因タグ | 上を機械的に要約 | 決算 / 業績修正 / 自己株 / TOB / 大量保有 / 地合い / 出来高急増 / 材料不明 … |
+
+## 4. GitHub Actions で適時開示を自動蓄積
+
+`.github/workflows/spike-tdnet.yml` が平日 18:30 JST に `update_daily.py` を実行し、
+`db/tdnet/*.csv` をコミットします。シークレットは不要です（公式 TDnet はキー不要）。
