@@ -3,6 +3,9 @@
 日本の上場企業のうち、インフラ（上下水道・道路橋梁・電力・ガス・鉄道・河川防災）向けの
 部材・機材・資材を「製造販売」する銘柄を洗い出したもの。作成日 2026-09-19。
 
+- `infra_materials_makers.csv` … UTF-8（BOM付き）。Excelでそのまま開ける
+- `infra_materials_makers_sjis.csv` … 同内容のShift_JIS版（古いExcel・他ツール向け）
+
 ## 列の意味
 
 | 列 | 内容 |
