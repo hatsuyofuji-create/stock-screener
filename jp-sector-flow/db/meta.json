@@ -1,13 +1,13 @@
 {
-  "updated_at": "2026-10-05T18:57:57",
+  "updated_at": "2026-10-06T16:22:39",
   "provider": "jquants",
-  "asof": "2026-10-05",
+  "asof": "2026-10-06",
   "metric": "turnover_oku",
   "n_sectors": 34,
   "n_days": 250,
   "top": [
     "電気機器",
     "情報･通信業",
-    "銀行業"
+    "非鉄金属"
   ]
 }
