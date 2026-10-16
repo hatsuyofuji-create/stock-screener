@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-10-15T14:32:12",
+  "updated_at": "2026-10-16T14:21:41",
   "provider": "jquants",
-  "asof": "2026-10-15",
+  "asof": "2026-10-16",
   "metric": "turnover_oku",
   "n_sectors": 34,
   "n_days": 250,
