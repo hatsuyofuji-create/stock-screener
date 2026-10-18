@@ -63,11 +63,17 @@ def _four(m: dict, keys=(5, 15, 30, 150)) -> str:
     return f"5日{_pm(g(5))} / 15日{_pm(g(15))} / 30日{_pm(g(30))} / 150日{_pm(g(150))}"
 
 
-def _build_message(ranking, asof, sox=None) -> str:
+def _build_message(ranking, asof, sox=None, market=None) -> str:
     lines = [f"📊 セクター資金フロー {asof.strftime('%Y-%m-%d')}"]
     if sox:
         lines.append(f"参考 SOX指数(米・半導体) {sox['level']:,.0f}")
         lines.append(f"　　{_four(sox['mom'])}")
+        lines.append("")
+    # 2026-10-18 追加：日本株全体（東証全銘柄）の売買代金（5日平均・兆円）と株価の方向
+    if market and market.get("total_oku"):
+        lines.append(f"日本株全体 売買代金 {market['total_oku'] / 1e4:.2f}兆円/日（5日平均）")
+        if market.get("mom"):
+            lines.append(f"　　{_four(market['mom'])}")
         lines.append("")
     lines.append("売買代金 上位業種（価格の方向 5/15/30/150日）:")
     for _, row in ranking.head(TOP_N).iterrows():
@@ -77,6 +83,16 @@ def _build_message(ranking, asof, sox=None) -> str:
             f"{int(row['rank'])}. {row['sector']}　{row['turnover']:,.0f}億円\n"
             f"　　{_four(pm)}"
         )
+    # 2026-10-18 追加（上原さんの助言）：シェア（業種÷合計）のZスコア。いつもより資金が集まっている／抜けている業種
+    if "share_z" in ranking.columns and ranking["share_z"].notna().any():
+        zr = ranking.dropna(subset=["share_z"]).sort_values("share_z", ascending=False)
+        lines.append("")
+        lines.append("資金が集まっている業種（売買代金シェアのZスコア 上位）:")
+        for _, row in zr.head(TOP_N).iterrows():
+            lines.append(f"・{row['sector']}　Z {row['share_z']:+.2f}（シェア {row['share_pct']:.1f}%）")
+        lines.append("資金が抜けている業種（Zスコア 下位）:")
+        for _, row in zr.tail(TOP_N).iloc[::-1].iterrows():
+            lines.append(f"・{row['sector']}　Z {row['share_z']:+.2f}（シェア {row['share_pct']:.1f}%）")
     lines.append("")
     lines.append("📈 全業種ランキング:")
     lines.append(PAGE_URL)
@@ -110,6 +126,14 @@ def main() -> int:
     flow_df.to_csv(DB_DIR / "turnover.csv", encoding="utf-8")
     ranking.to_csv(DB_DIR / "ranking.csv", index=False, encoding="utf-8")
     monthly.to_csv(DB_DIR / "monthly.csv", index=False, encoding="utf-8")
+    # 2026-10-18 追加：日本株全体（売買代金・株価指数）と業種ごとの株価指数（ページのチャート用）
+    market = result.get("market")
+    market_mom = result.get("market_mom") or {}
+    if market is not None and not market.empty:
+        market.to_csv(DB_DIR / "market.csv", encoding="utf-8")
+    pindex = result.get("pindex")
+    if pindex is not None and not pindex.empty:
+        pindex.to_csv(DB_DIR / "sector_index.csv", encoding="utf-8")
     meta = {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "provider": provider.name,
@@ -118,6 +142,10 @@ def main() -> int:
         "n_sectors": int(ranking.shape[0]),
         "n_days": int(flow_df.shape[0]),
         "top": ranking.head(TOP_N)["sector"].tolist(),
+        "market": {
+            "total_oku": float(market["total_oku"].iloc[-1]) if market is not None and not market.empty else None,
+            "mom": {str(k): v for k, v in market_mom.items()},
+        },
     }
     (DB_DIR / "meta.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -134,7 +162,7 @@ def main() -> int:
         print("SOX: 取得できませんでした（参考指標のみ・本体は継続）")
 
     # 通知
-    message = _build_message(ranking, asof, sox=sox)
+    message = _build_message(ranking, asof, sox=sox, market=meta.get("market"))
     line_notify.notify(message)
 
     top_str = " / ".join(meta["top"])

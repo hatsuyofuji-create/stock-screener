@@ -36,6 +36,24 @@ def _pct_change(idx: pd.Series, days: int) -> float:
     return round(float((idx.iloc[-1] / past - 1.0) * 100.0), 2)
 
 
+Z_WINDOW = 250   # シェアのZスコアを測る期間（営業日。約1年）
+
+
+def share_z(flow: pd.DataFrame, window: int = Z_WINDOW) -> pd.DataFrame:
+    """業種のシェア（業種の売買代金 ÷ 全業種合計）と、そのZスコア（2026-10-18 上原さんの助言）。
+    flow: 日付 × 業種の売買代金（5日移動平均）。
+    Zスコア＝（直近のシェア − 過去 window 日のシェアの平均）÷ 標準偏差。
+    プラスが大きい＝いつもより資金が集まっている（流入）、マイナスが大きい＝いつもより資金が抜けている（流出）。
+    戻り値: index=業種, columns=[share_pct（直近のシェア%）, share_z]"""
+    flow = flow.sort_index()
+    share = flow.div(flow.sum(axis=1), axis=0)
+    hist = share.tail(window)
+    mu, sd = hist.mean(), hist.std(ddof=0)
+    last = share.iloc[-1]
+    z = (last - mu) / sd.where(sd > 0)
+    return pd.DataFrame({"share_pct": (last * 100).round(2), "share_z": z.round(2)})
+
+
 def compute(
     turnover: pd.DataFrame,
     sector_map: dict[str, str],
@@ -51,6 +69,9 @@ def compute(
       - "ranking": DataFrame（rank, sector, turnover[億円], price_mom_5/15/30/150[%]）
       - "monthly": DataFrame（month, tri[兆円], days, partial。保存用）
       - "asof": 最終営業日（Timestamp）
+      - "pindex": DataFrame（日付 × 業種の株価指数。業種のチャート用）
+      - "market": DataFrame（日付 × total_oku[億円・5日平均], index。日本株全体）
+      - "market_mom": dict（全体の価格の方向 5/15/30/150日 [%]）
     """
     if turnover.empty:
         raise ValueError("売買代金データが空です。")
@@ -80,6 +101,11 @@ def compute(
     )
     ranking.insert(0, "rank", range(1, len(ranking) + 1))
     ranking["turnover"] = ranking["turnover"].round(1)
+    # シェア（業種÷合計）とそのZスコア（2026-10-18 追加。上原さんの助言「売買代金の大きさでなく、相対的に増えている業種を上に」）
+    sz = share_z(flow_ma)
+    ranking["share_pct"] = ranking["sector"].map(sz["share_pct"])
+    ranking["share_z"] = ranking["sector"].map(sz["share_z"])
+    ranking["z_rank"] = ranking["share_z"].rank(ascending=False, method="min").astype("Int64")
 
     # 価格の方向（5日・15日・30日・150日の変化率）
     close = close.sort_index() if (close is not None and not close.empty) else None
@@ -90,6 +116,21 @@ def compute(
         ranking[f"price_mom_{d}"] = ranking["sector"].map(
             lambda s, d=d: _pct_change(pidx[s], d) if pidx.get(s) is not None else None
         )
+
+    # 業種ごとの株価指数の推移（日付 × 業種。先頭=100）。業種をクリックした時のチャート用（2026-10-18 追加）
+    pindex_df = pd.DataFrame({sec: s for sec, s in pidx.items() if s is not None}).sort_index().round(2) if pidx else pd.DataFrame()
+
+    # 日本株全体（東証全銘柄）の売買代金と株価指数（2026-10-18 追加：日本株に資金が入っているか／離れているかを見る）
+    #   total_oku … 全銘柄の売買代金の合計（億円・5日移動平均）。index … 全銘柄の等ウェイト株価指数（先頭=100）
+    all_codes = [c for codes in sectors.values() for c in codes]
+    market = pd.DataFrame({"total_oku": flow_oku.sum(axis=1).rolling(SMOOTH_DAYS, min_periods=1).mean().round(1)})
+    market_mom: dict[int, float | None] = {d: None for d in HORIZONS}
+    if close is not None:
+        midx = _sector_price_index(close, all_codes)
+        if midx is not None:
+            market["index"] = midx.round(2)
+            market_mom = {d: _pct_change(midx, d) for d in HORIZONS}
+    market.index.name = "Date"
 
     # 全業種合計の月次売買代金（兆円）。生の売買代金（円）から集計（保存用）
     total_yen = turnover.sum(axis=1)
@@ -106,4 +147,7 @@ def compute(
         "ranking": ranking,
         "monthly": monthly,
         "asof": flow_ma.index[-1],
+        "pindex": pindex_df,          # 日付 × 業種の株価指数（先頭=100）
+        "market": market,             # 日付 × {total_oku, index}（日本株全体）
+        "market_mom": market_mom,     # 全体の価格の方向 {5,15,30,150: %}
     }
